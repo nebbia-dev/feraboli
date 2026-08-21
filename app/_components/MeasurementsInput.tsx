@@ -965,7 +965,7 @@ export default function MeasurementsInput() {
                                                     }}
                                                 >
                                                     <MenuItem value="5G">5 greche</MenuItem>
-                                                    <MenuItem disabled value="FC">Finto coppo</MenuItem>
+                                                    <MenuItem value="FC">Finto coppo</MenuItem>
                                                     <MenuItem value="L">Lamiera</MenuItem>
                                                 </Select>
                                             </FormControl>
@@ -1028,7 +1028,6 @@ export default function MeasurementsInput() {
                                                 <label
                                                     className="flex gap-4 items-center justify-between text-xs whitespace-nowrap">Spessore
                                                     <input
-                                                        required
                                                         value={measurements.thicknessTop}
                                                         name="thicknessTop"
                                                         onChange={(e) => validateInput(e)}

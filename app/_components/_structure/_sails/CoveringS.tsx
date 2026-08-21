@@ -66,18 +66,11 @@ export default function CoveringS({material} : {material : THREE.Material}) {
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
 
     const coveringRef = useRef<InstancedMesh|null>(null);
-    const supCoveringRef = useRef<InstancedMesh|null>(null);
-    const fcCovering = coveringType === 'FC'
-        ? baseModel?.coveringFCLeft
-        : undefined;
-    const fcCoveringMesh = fcCovering?.children[0] as THREE.Mesh | undefined;
-    const supCoveringMesh = fcCovering?.children[1] as THREE.Mesh | undefined;
     const coveringGeometry = coveringType === 'L'
         ? baseModel?.coveringLamLeft
         : coveringType === 'FC'
-            ? fcCoveringMesh?.geometry
+            ? baseModel?.coveringFCLeft
             : baseModel?.coveringLeft;
-    const supCoveringGeometry = supCoveringMesh?.geometry;
 
     const primaryRoofValues = getDefinedValues({
         beamLength,
@@ -97,7 +90,6 @@ export default function CoveringS({material} : {material : THREE.Material}) {
     if (
         !requiredValues
         || !coveringGeometry
-        || (coveringType === 'FC' && !supCoveringGeometry)
     ) {
         return null;
     }
@@ -145,10 +137,8 @@ export default function CoveringS({material} : {material : THREE.Material}) {
             : standardCount;
 
         useLayoutEffect(() => {
-            if (
-                !coveringRef.current
-                || (supCoveringGeometry && !supCoveringRef.current)
-            ) {
+            const covering = coveringRef.current;
+            if (!covering) {
                 return;
             }
 
@@ -159,17 +149,10 @@ export default function CoveringS({material} : {material : THREE.Material}) {
                 const beamsPerRow = sails - 1;
                 const lastBeamIndex = beamsPerRow - 1;
                 const centralBeamIndex = spansRight;
-                const instances = [
-                    coveringRef.current,
-                    supCoveringRef.current
-                ].filter((instance): instance is InstancedMesh => instance !== null);
-
-                instances.forEach((instance) => {
-                    instance.geometry.computeBoundingBox();
-                    const shift = instance.geometry.boundingBox?.max.x ?? 0;
-                    instance.geometry.translate(-shift, 0, 0);
-                    instance.geometry.attributes.position.needsUpdate = true;
-                });
+                covering.geometry.computeBoundingBox();
+                const shift = covering.geometry.boundingBox?.max.x ?? 0;
+                covering.geometry.translate(-shift, 0, 0);
+                covering.geometry.attributes.position.needsUpdate = true;
 
                 const setCoveringTransform = (
                     beamIndex: number,
@@ -236,9 +219,7 @@ export default function CoveringS({material} : {material : THREE.Material}) {
                                     -(zIndex + 0.5),
                                     xIndex
                                 );
-                                instances.forEach((instance) => {
-                                    instance.setMatrixAt(instanceIndex, mesh.matrix);
-                                });
+                                covering.setMatrixAt(instanceIndex, mesh.matrix);
                                 instanceIndex++;
                             }
                         });
@@ -252,15 +233,11 @@ export default function CoveringS({material} : {material : THREE.Material}) {
                             coveringSpanLengths[beamIndex],
                             -interaxleLength * (rowIndex + 0.5)
                         );
-                        instances.forEach((instance) => {
-                            instance.setMatrixAt(i, mesh.matrix);
-                        });
+                        covering.setMatrixAt(i, mesh.matrix);
                     }
                 }
 
-                instances.forEach((instance) => {
-                    instance.instanceMatrix.needsUpdate = true;
-                });
+                covering.instanceMatrix.needsUpdate = true;
             }
         }, [
             count,
@@ -270,18 +247,10 @@ export default function CoveringS({material} : {material : THREE.Material}) {
         ]);
 
         return (
-            <>
-                {supCoveringGeometry &&
-                    <instancedUniformsMesh
-                        ref={supCoveringRef}
-                        args={[supCoveringGeometry, material, count]}>
-                    </instancedUniformsMesh>
-                }
-                <instancedUniformsMesh
-                    ref={coveringRef}
-                    args={[coveringGeometry, material, count]}>
-                </instancedUniformsMesh>
-            </>
+            <instancedUniformsMesh
+                ref={coveringRef}
+                args={[coveringGeometry, material, count]}>
+            </instancedUniformsMesh>
         )
     }
 

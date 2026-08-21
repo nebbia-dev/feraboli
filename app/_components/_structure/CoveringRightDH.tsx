@@ -18,18 +18,11 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
 
     const coveringRef = useRef<InstancedMesh|null>(null);
-    const supCoveringRef = useRef<InstancedMesh|null>(null);
-    const fcCovering = coveringType === 'FC'
-        ? baseModel?.coveringFCRight
-        : undefined;
-    const fcCoveringMesh = fcCovering?.children[0] as THREE.Mesh | undefined;
-    const supCoveringMesh = fcCovering?.children[1] as THREE.Mesh | undefined;
     const coveringGeometry = coveringType === 'L'
         ? baseModel?.coveringLamRight
         : coveringType === 'FC'
-            ? fcCoveringMesh?.geometry
+            ? baseModel?.coveringFCRight
             : baseModel?.coveringRight;
-    const supCoveringGeometry = supCoveringMesh?.geometry;
     const requiredValues = getDefinedValues({
         coveringLengthDH,
         eavesHeight,
@@ -42,7 +35,6 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
     if (
         !requiredValues
         || !coveringGeometry
-        || (coveringType === 'FC' && !supCoveringGeometry)
         || (requiredValues.pillars < 3 && pitches?.includes('M'))
     ) {
         return null;
@@ -58,26 +50,16 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
 
         useLayoutEffect(() => {
             const purlinOffset = purlinType === 'light' ? 0.18 : 0;
-            if (
-                !coveringRef.current
-                || (supCoveringGeometry && !supCoveringRef.current)
-            ) {
+            if (!coveringRef.current) {
                 return;
             }
 
             const {coveringLengthDH, eavesHeight, roofInclineRad, width, pillars} = requiredValues;
             const mesh = new THREE.Object3D();
-            const instances = [
-                coveringRef.current,
-                supCoveringRef.current
-            ].filter((instance): instance is InstancedMesh => instance !== null);
-
-            instances.forEach((instance) => {
-                instance.geometry.computeBoundingBox();
-                const shift = instance.geometry.boundingBox!.min.x;
-                instance.geometry.translate(-shift, 0, 0);
-                instance.geometry.attributes.position.needsUpdate = true;
-            });
+            coveringRef.current.geometry.computeBoundingBox();
+            const shift = coveringRef.current.geometry.boundingBox!.min.x;
+            coveringRef.current.geometry.translate(-shift, 0, 0);
+            coveringRef.current.geometry.attributes.position.needsUpdate = true;
 
             for (let i = 0; i < count; i++) {
                 const xIndex = i % xCount;
@@ -92,29 +74,17 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
                 mesh.rotation.set(0, Math.PI, roofInclineRad);
                 mesh.translateX(xIndex);
                 mesh.updateMatrix();
-                instances.forEach((instance) => {
-                    instance.setMatrixAt(i, mesh.matrix);
-                });
+                coveringRef.current.setMatrixAt(i, mesh.matrix);
             }
 
-            instances.forEach((instance) => {
-                instance.instanceMatrix.needsUpdate = true;
-            });
+            coveringRef.current.instanceMatrix.needsUpdate = true;
         }, [count, xCount])
 
         return (
-            <>
-                {supCoveringGeometry &&
-                    <instancedUniformsMesh
-                        ref={supCoveringRef}
-                        args={[supCoveringGeometry, material, count]}>
-                    </instancedUniformsMesh>
-                }
-                <instancedUniformsMesh
-                    ref={coveringRef}
-                    args={[coveringGeometry, material, count]}>
-                </instancedUniformsMesh>
-            </>
+            <instancedUniformsMesh
+                ref={coveringRef}
+                args={[coveringGeometry, material, count]}>
+            </instancedUniformsMesh>
         )
     }
 
