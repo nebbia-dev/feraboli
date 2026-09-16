@@ -41,7 +41,9 @@ export default function MeasurementsInput() {
         coveringType: '',
         coveringSubType: '',
         thicknessTop: '',
-        thicknessBottom: ''
+        thicknessBottom: '',
+        overhangLeft: '',
+        overhangRight: ''
     });
 
     function editPillars(n:number) {
@@ -497,6 +499,10 @@ export default function MeasurementsInput() {
            return;
        }
 
+       if(measurements.overhangRight === '' || measurements.overhangLeft === '') {
+           return;
+       }
+
        if(measurements.coveringType === '5G' && measurements.coveringSubType === '') {
            return;
        }
@@ -608,7 +614,8 @@ export default function MeasurementsInput() {
                                         {measurements.pillars === '10' &&
                                             <>
                                                 <div className="flex flex-col gap-2">
-                                                    <p className="uppercase text-xsm font-semibold">Campate a sinistra</p>
+                                                    <p className="uppercase text-xsm font-semibold">Campate a
+                                                        sinistra</p>
                                                     <div className="flex gap-2">
                                                         <button type="button" onClick={() => editSpans(0, 'right')}
                                                                 className="cursor-pointer border-2 border-strokes rounded-lg px-2 py-1 focus:border-primary focus:outline-none focus:ring-0">
@@ -665,7 +672,8 @@ export default function MeasurementsInput() {
                                                 <p className="uppercase text-xsm font-semibold">Numero
                                                     {Number(measurements.pillars) > 3 ? ' altezze' : ' falde'}</p>
                                                 <div className="flex gap-2">
-                                                    <button type="button" onClick={() => editPitches(0, Number(measurements.pillars))}
+                                                    <button type="button"
+                                                            onClick={() => editPitches(0, Number(measurements.pillars))}
                                                             className="cursor-pointer border-2 border-strokes rounded-lg px-2 py-1 focus:border-primary focus:outline-none focus:ring-0">
                                                         <Image src="/prev.svg" alt="icona elemento precedente"
                                                                width={16} height={16} aria-hidden/>
@@ -674,7 +682,8 @@ export default function MeasurementsInput() {
                                                         className="flex items-center py-1 px-2 w-full justify-center rounded-lg border-strokes border-2 font-jet text-xs font-semibold">
                                                         {measurements.pitches === '' ? '-' : setPitchesLabel(measurements.pitches as string)}
                                                     </div>
-                                                    <button type="button" onClick={() => editPitches(1, Number(measurements.pillars))}
+                                                    <button type="button"
+                                                            onClick={() => editPitches(1, Number(measurements.pillars))}
                                                             className="cursor-pointer border-2 border-strokes rounded-lg px-2 py-1 focus:border-primary focus:outline-none focus:ring-0">
                                                         <Image src="/next.svg" alt="icona elemento successivo"
                                                                width={16} height={16} aria-hidden/>
@@ -685,15 +694,17 @@ export default function MeasurementsInput() {
 
                                         {Number(measurements.pillars) > 3 && measurements.pitches === 'DH' &&
 
-                                            <label className="flex flex-col uppercase text-xsm font-semibold">Seconda altezza
-                                                <div className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>
-                                                    <input
-                                                        required
-                                                        className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"
-                                                        value={measurements.secondHeight}
-                                                        name="secondHeight"
-                                                        onChange={validateInput}
-                                                    />
+                                            <label className="flex flex-col uppercase text-xsm font-semibold">Seconda
+                                                altezza
+                                                <div
+                                                    className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>
+                                                <input
+                                                    required
+                                                    className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"
+                                                    value={measurements.secondHeight}
+                                                    name="secondHeight"
+                                                    onChange={validateInput}
+                                                />
                                             </label>
                                         }
 
@@ -785,6 +796,47 @@ export default function MeasurementsInput() {
                                                 onChange={validateInput}
                                             />
                                         </label>
+
+                                        {/* PROBLEMA: QUESTO NON SI PUÒ CAMBIARE SE NON NELLA MISURA TRA LE SINGOLE COPPIE, ALTRIMENTI LE MISURE NON TORNANO */}
+                                        {/*<label className="flex flex-col uppercase text-xsm font-semibold">Interasse*/}
+                                        {/*    (larghezza)*/}
+                                        {/*    <div*/}
+                                        {/*        className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>*/}
+                                        {/*    <input*/}
+                                        {/*        required*/}
+                                        {/*        className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"*/}
+                                        {/*        value=""*/}
+                                        {/*        name="interaxleLength"*/}
+                                        {/*        onChange={validateInput}*/}
+                                        {/*    />*/}
+                                        {/*</label>*/}
+
+                                        {/*  SPORTO DESTRO  */}
+                                        <label className="flex flex-col uppercase text-xsm font-semibold">Sporto destro
+                                            <div
+                                                className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>
+                                            <input
+                                                required
+                                                className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"
+                                                value={measurements.overhangRight}
+                                                name="overhangRight"
+                                                onChange={validateInput}
+                                            />
+                                        </label>
+
+                                        {/*  SPORTO SINISTRO  */}
+                                        <label className="flex flex-col uppercase text-xsm font-semibold">Sporto sinistro
+                                            <div
+                                                className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>
+                                            <input
+                                                required
+                                                className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"
+                                                value={measurements.overhangLeft}
+                                                name="overhangLeft"
+                                                onChange={validateInput}
+                                            />
+                                        </label>
+
                                     </div>
                                 </AccordionDetails>
                             </Accordion>

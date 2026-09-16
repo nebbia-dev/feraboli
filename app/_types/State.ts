@@ -55,7 +55,9 @@ export interface Measurements {
     coveringType: string,
     coveringSubType: string,
     thicknessTop: string,
-    thicknessBottom: string
+    thicknessBottom: string,
+    overhangLeft: string,
+    overhangRight: string
 }
 export interface Pillar {
     heightToAdd: number | undefined,
@@ -84,6 +86,12 @@ export interface State {
     width: number | undefined,
     interaxleLength: number | undefined,
     interaxleWidth: number | undefined,
+    overhangLeft: number | undefined,
+    overhangRight: number | undefined,
+    beamRightLength: number | undefined,
+    beamLeftLength: number | undefined,
+    coveringRightLength: number | undefined,
+    coveringLeftLength: number | undefined,
     domeType: string | undefined,
     purlinType: string | undefined,
     purlinShape: string | undefined,
@@ -125,6 +133,8 @@ export interface State {
     secondCoveringLength: number | undefined,
     halfPurlinsDH: number | undefined,
     halfPurlins: number | undefined,
+    halfRightPurlins: number | undefined,
+    halfLeftPurlins: number | undefined,
     secondHalfPurlins: number | undefined,
     domeHeight: number | undefined,
     domeWidth: number | undefined,

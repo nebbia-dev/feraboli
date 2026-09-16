@@ -10,7 +10,7 @@ export default function CoveringRight({material} : {material : THREE.Material}) 
     const coveringType = useMeasurementsStore((state: State) => state.coveringType.type);
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
-    const coveringLength = useMeasurementsStore((state: State) => state.coveringLength);
+    const coveringRightLength = useMeasurementsStore((state: State) => state.coveringRightLength);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
@@ -18,6 +18,8 @@ export default function CoveringRight({material} : {material : THREE.Material}) 
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
 
     const coveringRef = useRef<InstancedMesh|null>(null);
     const coveringGeometry = coveringType === 'L'
@@ -27,12 +29,14 @@ export default function CoveringRight({material} : {material : THREE.Material}) 
             : baseModel?.coveringRight;
 
     const requiredValues = getDefinedValues({
-        coveringLength,
+        coveringRightLength,
         eavesHeight,
         roofInclineRad: roofIncline.rad,
         width,
         length,
-        pillars
+        pillars,
+        overhangRight,
+        overhangLeft
     });
 
     if (
@@ -44,9 +48,9 @@ export default function CoveringRight({material} : {material : THREE.Material}) 
     }
 
     const COVERINGRIGHT = () => {
-        const {length, coveringLength} = requiredValues;
+        const {length, coveringRightLength} = requiredValues;
         const xCount = coveringType === 'FC'
-            ? Math.max(1, Math.floor(coveringLength))
+            ? Math.max(1, Math.floor(coveringRightLength))
             : 1;
         const zCount = Math.floor(length) + 1;
         const count = xCount * zCount;
@@ -57,11 +61,14 @@ export default function CoveringRight({material} : {material : THREE.Material}) 
                 return;
             }
 
-            const {coveringLength, eavesHeight, roofInclineRad, width, pillars} = requiredValues;
+            const {coveringRightLength, eavesHeight, roofInclineRad, width, pillars, overhangRight, overhangLeft} = requiredValues;
+            const hoverhang = overhangLeft > overhangRight ? (overhangLeft - overhangRight) : 0;
+
             const mesh = new THREE.Object3D();
             const beamPosition = (interaxleWidth && pillars > 3 && pitches === 'DH')
                 ? (interaxleWidth / 2) + 0.5
-                : (width / 2);
+                : (width / 2) + overhangRight;
+            const hta = hoverhang * Math.tan(roofInclineRad);
 
             coveringRef.current.geometry.computeBoundingBox();
             const shift = coveringRef.current.geometry.boundingBox!.min.x;
@@ -73,13 +80,13 @@ export default function CoveringRight({material} : {material : THREE.Material}) 
                 const zIndex = Math.floor(i / xCount);
 
                 mesh.scale.x = pillars === 1 && pitches === 'D'
-                    ? coveringLength + 1
+                    ? coveringRightLength + 1
                     : coveringType === 'FC'
                         ? 1
-                        : coveringLength;
+                        : coveringRightLength;
                 mesh.position.set(
                     beamPosition,
-                    eavesHeight - purlinOffset + secondHeightOffset,
+                    eavesHeight + hta - purlinOffset + secondHeightOffset,
                     -zIndex
                 );
                 mesh.rotation.set(0, Math.PI, roofInclineRad);
