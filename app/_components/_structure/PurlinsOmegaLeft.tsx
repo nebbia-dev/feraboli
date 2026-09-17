@@ -88,6 +88,7 @@ export default function PurlinsOmegaLeft({material} : {material : THREE.Material
             const purlinOffset = purlinType === 'light' ? 0.21 : 0;
 
             for(let i = 0; i < hP; i++) {
+                const hasProfileOffset = !(isMono && i === hP - 1);
                 const h = ((purlinGap * i) - 0.1) * Math.sin(roofRad);
                 const b = Math.sqrt(Math.pow((purlinGap * i), 2) - Math.pow(h, 2))
                 const purlinHeight = i === 0
@@ -110,8 +111,8 @@ export default function PurlinsOmegaLeft({material} : {material : THREE.Material
                 const shift =  ref.current.geometry.boundingBox!.max.x;
                 ref.current.geometry.translate(-shift, 0, 0);
                 mesh.position.set(
-                    purlinPos + omegaOffsetX,
-                    purlinHeight + omegaOffsetY,
+                    purlinPos + (hasProfileOffset ? omegaOffsetX : 0),
+                    purlinHeight + (hasProfileOffset ? omegaOffsetY : 0),
                     -length / 2
                 );
                 mesh.rotation.set(0, 0, roofRad)
