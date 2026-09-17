@@ -14,11 +14,8 @@ export default function Reticular() {
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
-    const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeight = useMeasurementsStore((state: State) => state.secondHeight);
-    const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
-    const beamMaxHeight = useMeasurementsStore((state: State) => state.beamMaxHeight);
-    const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
+    const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
 
     const ref = useRef<THREE.Mesh|null>(null);
     const sourceTexture = useTexture('/zigzag2.webp');
@@ -34,13 +31,10 @@ export default function Reticular() {
     useEffect(() => () => texture.dispose(), [texture]);
 
     const requiredValues = getDefinedValues({
-        interaxleWidth,
         pillarsHeight,
         width,
         length,
-        beamMaxHeight,
-        secondHeightOffset,
-        eavesHeight,
+        roofInclineRad: roofIncline.rad,
         interaxleLength,
         pillars
     });
@@ -48,28 +42,23 @@ export default function Reticular() {
     if (!requiredValues) return null;
 
     const RETICULAR = () => {
-        const {pillars, length, interaxleLength, width, interaxleWidth, eavesHeight, beamMaxHeight, secondHeightOffset, pillarsHeight} = requiredValues;
+        const {pillars, length, interaxleLength, width, roofInclineRad, pillarsHeight} = requiredValues;
         const hasSecondHeight = secondHeight !== undefined;
         const frames = (length / interaxleLength) + 1;
-        const effWidth = hasSecondHeight ? width / 2 : width;
-        const effBeams = hasSecondHeight ? frames * 2 : frames;
-        const halfPillars = pillars / 2;
+        const leftPillarIndex = hasSecondHeight ? Math.floor(pillars / 2) - 1 : 0;
+        const rightPillarIndex = hasSecondHeight ? Math.floor(pillars / 2) : pillars - 1;
+        const leftX = pillarsHeight[leftPillarIndex].position! - (width / 2);
+        const rightX = pillarsHeight[rightPillarIndex].position! - (width / 2);
+        const leftHeight = pillarsHeight[leftPillarIndex].totalHeight as number;
+        const rightHeight = pillarsHeight[rightPillarIndex].totalHeight as number;
+        const ridgeX = (leftX + rightX) / 2;
+        const ridgeHeight = leftHeight + (ridgeX - leftX) * Math.tan(roofInclineRad);
 
-        let vertices;
-
-        if(hasSecondHeight) {
-            vertices = new Float32Array([
-                pillarsHeight[halfPillars - 1].position! - (width / 2), pillarsHeight[halfPillars - 1].totalHeight as number,  0.0, // bottom left
-                pillarsHeight[halfPillars].position! - (width / 2), pillarsHeight[halfPillars].totalHeight as number,  0.0, // bottom right
-                0.0,  eavesHeight + secondHeightOffset + beamMaxHeight,  0.0  // top center
-            ]);
-        } else {
-            vertices = new Float32Array([
-                pillarsHeight[0].position! - (width / 2), pillarsHeight[0].totalHeight as number,  0.0, // bottom left
-                pillarsHeight[pillarsHeight.length - 1].position! - (width / 2), pillarsHeight[pillarsHeight.length - 1].totalHeight as number,  0.0, // bottom right
-                0.0,  eavesHeight + beamMaxHeight,  0.0  // top center
-            ]);
-        }
+        const vertices = new Float32Array([
+            leftX, leftHeight, 0.0,
+            rightX, rightHeight, 0.0,
+            ridgeX, ridgeHeight, 0.0
+        ]);
 
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
@@ -93,21 +82,16 @@ export default function Reticular() {
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {width, interaxleLength} = requiredValues;
+            const {interaxleLength} = requiredValues;
             const mesh = new THREE.Object3D();
 
             for (let i = 0; i < frames; i++) {
-
-                if(!hasSecondHeight) {
-                    mesh.position.set(pillarsHeight[0].position! - (width / 2) + (effWidth - interaxleWidth) / 2, 0, -interaxleLength * i);
-                } else {
-                    mesh.position.set(0, 0, -interaxleLength * i);
-                }
+                mesh.position.set(0, 0, -interaxleLength * i);
                 mesh.updateMatrix();
                 (ref.current as InstancedMesh).setMatrixAt(i, mesh.matrix);
             }
 
-        }, [effBeams, effWidth, frames, hasSecondHeight, interaxleLength, interaxleWidth, pillarsHeight]);
+        }, [frames, interaxleLength]);
 
         return (
             <instancedUniformsMesh ref={ref}

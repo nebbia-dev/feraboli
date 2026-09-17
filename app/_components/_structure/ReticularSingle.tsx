@@ -16,7 +16,6 @@ export default function ReticularSingle() {
     const length = useMeasurementsStore((state: State) => state.length);
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
-    const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
 
 
@@ -37,17 +36,16 @@ export default function ReticularSingle() {
         pillarsHeight,
         width,
         length,
-        eavesHeight,
         interaxleLength,
         pillars,
         pitches,
-        roofInclinePercentage: roofIncline.percentage
+        roofInclineRad: roofIncline.rad
     });
 
     if (!requiredValues) return null;
 
     const RETICULAR = () => {
-        const {pillars, pitches, length, interaxleLength, width, roofInclinePercentage, eavesHeight, pillarsHeight} = requiredValues;
+        const {pillars, pitches, length, interaxleLength, width, roofInclineRad, pillarsHeight} = requiredValues;
         const frames = (length / interaxleLength) + 1;
         const isShed = pitches === 'S' && pillars === 3;
         const centralPillarIndex = isShed
@@ -55,12 +53,12 @@ export default function ReticularSingle() {
             : Math.floor(pillars / 2) - 1;
         const centralPillarPosition = pillarsHeight[centralPillarIndex].position!;
         const centralX = centralPillarPosition - (width / 2);
-        const height = isShed
-            ? pillarsHeight[centralPillarIndex].totalHeight as number
-            : eavesHeight + (roofInclinePercentage * centralPillarPosition) / 100;
         const index = isShed ? pillars - 1 : 0;
         const leftX = pillarsHeight[0].position! - (width / 2);
         const baseHeight = pillarsHeight[index].totalHeight as number;
+        const height = isShed
+            ? pillarsHeight[centralPillarIndex].totalHeight as number
+            : baseHeight + (centralX - leftX) * Math.tan(roofInclineRad);
 
         const vertices = isShed
             ? new Float32Array([

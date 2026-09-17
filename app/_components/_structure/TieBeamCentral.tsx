@@ -29,28 +29,31 @@ export default function TieBeamCentral({material} : {material : THREE.Material})
     if (!requiredValues) return null;
 
     const TIEBEAMCENTRAL = () => {
-        const {length, interaxleLength, interaxleWidth, pillarsHeight} = requiredValues;
+        const {length, interaxleLength, width, pillars, pillarsHeight} = requiredValues;
         const effBeams = (length / interaxleLength) + 1;
-        const tieBeamGeometry = new THREE.CylinderGeometry(0.01, 0.01, interaxleWidth, 6);
+        const leftPillarIndex = Math.floor(pillars / 2) - 1;
+        const rightPillarIndex = Math.floor(pillars / 2);
+        const leftX = pillarsHeight[leftPillarIndex].position! - (width / 2);
+        const rightX = pillarsHeight[rightPillarIndex].position! - (width / 2);
+        const tieBeamGeometry = new THREE.CylinderGeometry(0.01, 0.01, rightX - leftX, 6);
 
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {width, interaxleLength, pillars} = requiredValues;
+            const {interaxleLength} = requiredValues;
             const mesh = new THREE.Object3D();
-            const pillarIndex = Math.floor(pillars / 2) - 1;
 
             for (let i = 0; i < effBeams; i++) {
                 mesh.position.set(
-                    pillarsHeight[pillarIndex].position! - (width / 2) + (interaxleWidth / 2),
-                    pillarsHeight[pillarIndex].totalHeight!,
+                    (leftX + rightX) / 2,
+                    pillarsHeight[leftPillarIndex].totalHeight!,
                     -interaxleLength * i
                 );
                 mesh.rotation.set(0, 0, Math.PI/2);
                 mesh.updateMatrix();
                 (ref.current as InstancedMesh).setMatrixAt(i, mesh.matrix);
             }
-        }, [effBeams, interaxleWidth]);
+        }, [effBeams, interaxleLength, leftPillarIndex, leftX, pillarsHeight, rightX]);
 
         return (
             <instancedUniformsMesh ref={ref}

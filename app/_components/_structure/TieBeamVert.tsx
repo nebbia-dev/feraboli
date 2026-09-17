@@ -18,7 +18,6 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
-    const secondBeamLength = useMeasurementsStore((state: State) => state.secondBeamLength);
     const secondRoofIncline = useMeasurementsStore((state: State) => state.secondRoofIncline);
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeight = useMeasurementsStore((state: State) => state.secondHeight);
@@ -45,23 +44,35 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
     outerMaterialLeft.clippingPlanes = [outerPlaneLeft];
     outerMaterialRight.clippingPlanes = [outerPlaneRight];
 
-    const secondRoofValues = getDefinedValues({
-        secondBeamLength,
-        eavesHeight,
-        secondRoofInclineRad: secondRoofIncline.rad,
-        width
-    });
+    const isDoubleHeight = pillars !== undefined && pillars > 3 && pitches === 'DH';
+    const isShed = pillars === 3 && pitches === 'S';
+    const isMono = pillars !== undefined && pillars < 3 && pitches?.includes('M');
+    const primaryLeftBeamLength = isDoubleHeight || isMono
+        ? beamLength
+        : beamLeftLength;
+    const primaryRightBeamLength = isDoubleHeight
+        ? beamLength
+        : isMono
+            ? primaryLeftBeamLength
+            : beamRightLength;
+    const primaryLeftRoofInclineRad = isShed
+        ? secondRoofIncline.rad
+        : roofIncline.rad;
     const primaryRoofValues = getDefinedValues({
-        beamLength,
+        primaryLeftBeamLength,
+        primaryRightBeamLength,
         interaxleWidth,
         eavesHeight,
         roofInclineRad: roofIncline.rad,
+        primaryLeftRoofInclineRad,
         pillarsHeight,
         width,
         length,
         interaxleLength,
         pillars,
         secondHeightOffset,
+        overhangLeft,
+        overhangRight,
         beamBoundingBox: beamGeometry?.boundingBox
     });
     const doubleHeightValues = secondHeight !== undefined
@@ -88,14 +99,18 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
 
             if (primaryRoofValues) {
                 const {
-                    beamLength,
+                    primaryLeftBeamLength,
+                    primaryRightBeamLength,
                     eavesHeight,
                     pillarsHeight,
                     roofInclineRad,
+                    primaryLeftRoofInclineRad,
                     width,
                     interaxleLength,
                     pillars,
                     secondHeightOffset,
+                    overhangLeft,
+                    overhangRight,
                     beamBoundingBox
                 } = primaryRoofValues;
                 const mesh = new THREE.Object3D();
@@ -121,11 +136,13 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
                     const xOffset = localIndex % 2 === 0
                         ? interaxleWidth / 3
                         : (interaxleWidth / 3) * 2;
-                    const tieBeamPillarIndex = hasSecondHeight && isCentral
-                        ? Math.floor(pillars / 2) - 1
-                        : pitches === 'S' && pillars === 3
-                             ? pillars - 1
-                             : 0;
+                    const tieBeamPillarIndex = pitches === 'S' && pillars === 3
+                        ? pillars - 1
+                        : hasSecondHeight && isCentral
+                            ? Math.floor(pillars / 2) - 1
+                            : hasSecondHeight && !isLeft
+                                ? pillars - 1
+                                : 0;
 
                     mesh.position.set(
                         pillarsHeight[pillarIndex].position! + xOffset - (width / 2),
@@ -149,43 +166,49 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
                     }
                 }
 
+                const leftHeightOffset = !isDoubleHeight
+                    ? Math.max(overhangRight - overhangLeft, 0) * Math.tan(roofInclineRad)
+                    : 0;
+                const rightHeightOffset = !isDoubleHeight
+                    ? Math.max(overhangLeft - overhangRight, 0) * Math.tan(roofInclineRad)
+                    : 0;
                 const leftBeamMatrix = new THREE.Matrix4().compose(
                     new THREE.Vector3(
-                        secondRoofValues ? -(secondRoofValues.width / 2) : leftBeamPosition,
-                        secondRoofValues
-                            ? secondRoofValues.eavesHeight
-                            : eavesHeight + secondHeightOffset,
+                        isDoubleHeight
+                            ? leftBeamPosition
+                            : -(width / 2) - overhangLeft,
+                        eavesHeight + secondHeightOffset + leftHeightOffset,
                         0
                     ),
                     new THREE.Quaternion().setFromEuler(
                         new THREE.Euler(
                             0,
                             Math.PI,
-                            -(secondRoofValues?.secondRoofInclineRad ?? roofInclineRad)
+                            -primaryLeftRoofInclineRad
                         )
                     ),
                     new THREE.Vector3(
-                        secondRoofValues
-                            ? secondRoofValues.secondBeamLength + 1
-                            : pillars < 3 && pitches?.includes('M')
-                                ? beamLength
-                                : beamLength + 1,
+                        isMono
+                            ? primaryLeftBeamLength
+                            : primaryLeftBeamLength + 1,
                         1,
                         1
                     )
                 );
-                const rightBeamMatrix = pillars < 3 && pitches?.includes('M')
+                const rightBeamMatrix = isMono
                     ? leftBeamMatrix
                     : new THREE.Matrix4().compose(
                         new THREE.Vector3(
-                            rightBeamPosition,
-                            eavesHeight + secondHeightOffset,
+                            isDoubleHeight
+                                ? rightBeamPosition
+                                : (width / 2) + overhangRight,
+                            eavesHeight + secondHeightOffset + rightHeightOffset,
                             0
                         ),
                         new THREE.Quaternion().setFromEuler(
                             new THREE.Euler(0, 0, -roofInclineRad)
                         ),
-                        new THREE.Vector3(beamLength + 1, 1, 1)
+                        new THREE.Vector3(primaryRightBeamLength + 1, 1, 1)
                     );
 
                 // Porta la faccia inferiore di ciascuna trave nello spazio mondo.

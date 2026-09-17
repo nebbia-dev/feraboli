@@ -14,7 +14,6 @@ export default function ReticularSingleOpp() {
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
-    const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
 
 
@@ -35,26 +34,27 @@ export default function ReticularSingleOpp() {
         pillarsHeight,
         width,
         length,
-        eavesHeight,
         interaxleLength,
         pillars,
-        roofInclinePercentage: roofIncline.percentage
+        roofInclineRad: roofIncline.rad
     });
 
     if (!requiredValues) return null;
 
     const RETICULAR = () => {
-        const {pillars, length, interaxleLength, width, roofInclinePercentage, eavesHeight, pillarsHeight} = requiredValues;
+        const {pillars, length, interaxleLength, width, roofInclineRad, pillarsHeight} = requiredValues;
         const frames = (length / interaxleLength) + 1;
         const centralPillarIndex = Math.floor(pillars / 2);
         const centralPillarPosition = pillarsHeight[centralPillarIndex].position!;
         const centralX = centralPillarPosition - (width / 2);
-        const distanceFromRightEave = width - centralPillarPosition;
+        const rightX = pillarsHeight[pillars - 1].position! - (width / 2);
+        const baseHeight = pillarsHeight[pillars - 1].totalHeight as number;
+        const centralRoofHeight = baseHeight + (rightX - centralX) * Math.tan(roofInclineRad);
 
         const vertices = new Float32Array([
-                pillarsHeight[pillars - 1].position! - (width / 2), pillarsHeight[pillars - 1].totalHeight as number,  0.0, // bottom right
-                centralX, pillarsHeight[pillars - 1].totalHeight as number,  0.0, // bottom left
-                centralX, eavesHeight + (roofInclinePercentage * distanceFromRightEave) / 100,  0.0  // top
+                rightX, baseHeight, 0.0, // bottom right
+                centralX, baseHeight, 0.0, // bottom left
+                centralX, centralRoofHeight, 0.0  // top
             ]);
 
         const geometry = new THREE.BufferGeometry();

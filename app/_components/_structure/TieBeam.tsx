@@ -30,36 +30,46 @@ export default function TieBeam({material} : {material : THREE.Material}) {
     if (!requiredValues) return null;
 
     const TIEBEAM = () => {
-        const {length, interaxleLength, width, interaxleWidth, pitches, pillarsHeight} = requiredValues;
+        const {length, interaxleLength, width, pitches, pillarsHeight, pillars} = requiredValues;
         const hasSecondHeight = secondHeight !== undefined;
         const frames = (length / interaxleLength) + 1;
-        const effWidth = hasSecondHeight ? width / 2 : width;
         const effBeams = hasSecondHeight ? frames * 2 : frames;
-        const tieBeamGeometry = new THREE.CylinderGeometry(0.01, 0.01,effWidth - interaxleWidth, 6);
+        const leftCentralPillarIndex = Math.floor(pillars / 2) - 1;
+        const rightCentralPillarIndex = Math.floor(pillars / 2);
+        const leftStartX = pillarsHeight[0].position! - (width / 2);
+        const leftEndX = hasSecondHeight
+            ? pillarsHeight[leftCentralPillarIndex].position! - (width / 2)
+            : pillarsHeight[pillars - 1].position! - (width / 2);
+        const rightStartX = pillarsHeight[rightCentralPillarIndex].position! - (width / 2);
+        const rightEndX = pillarsHeight[pillars - 1].position! - (width / 2);
+        const tieBeamLength = leftEndX - leftStartX;
+        const tieBeamGeometry = new THREE.CylinderGeometry(0.01, 0.01, tieBeamLength, 6);
 
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {width, interaxleLength, pillars} = requiredValues;
+            const {interaxleLength, pillars} = requiredValues;
             const mesh = new THREE.Object3D();
 
             for (let i = 0; i < effBeams; i++) {
                 if (hasSecondHeight) {
                     const isLeft = i % 2 === 0;
+                    const startX = isLeft ? leftStartX : rightStartX;
+                    const endX = isLeft ? leftEndX : rightEndX;
                     const pillarIndex = isLeft ? 0 : pillars - 1;
-                    const xOffset = (isLeft ? 1 : -1) * (effWidth - interaxleWidth) / 2;
 
                     mesh.position.set(
-                        pillarsHeight[pillarIndex].position! - (width / 2) + xOffset,
+                        (startX + endX) / 2,
                         pillarsHeight[pillarIndex].totalHeight!,
                         -interaxleLength * Math.floor(i / 2)
                     );
                 } else {
+                    const tieBeamX = (leftStartX + leftEndX) / 2;
                     if(pitches === 'S' && pillars === 3) {
-                        mesh.position.set(0, pillarsHeight[pillars - 1].totalHeight!, -interaxleLength * i);
+                        mesh.position.set(tieBeamX, pillarsHeight[pillars - 1].totalHeight!, -interaxleLength * i);
 
                     } else {
-                        mesh.position.set(0, pillarsHeight[0].totalHeight!, -interaxleLength * i);
+                        mesh.position.set(tieBeamX, pillarsHeight[0].totalHeight!, -interaxleLength * i);
                     }
                 }
 
@@ -67,7 +77,7 @@ export default function TieBeam({material} : {material : THREE.Material}) {
                 mesh.updateMatrix();
                 (ref.current as InstancedMesh).setMatrixAt(i, mesh.matrix);
             }
-        }, [effBeams, effWidth, hasSecondHeight, interaxleLength, interaxleWidth]);
+        }, [effBeams, hasSecondHeight, interaxleLength, leftEndX, leftStartX, pillarsHeight, pitches, rightEndX, rightStartX]);
 
         return (
             <instancedUniformsMesh ref={ref}
