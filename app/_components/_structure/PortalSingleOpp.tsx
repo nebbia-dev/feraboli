@@ -16,9 +16,12 @@ export default function PortalSingleOpp({material} : {material : THREE.Material}
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
+    const secondHeight = useMeasurementsStore((state: State) => state.secondHeight);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
 
     const firstRef = useRef<THREE.Mesh|null>(null);
     const secondRef = useRef<THREE.Mesh|null>(null);
+    const outerLeftRef = useRef<THREE.Mesh|null>(null);
     const portalSGeometry = baseModel?.capitalPortalSOpp;
     const beamClipping = useBeamClippingMaterials(material);
 
@@ -30,24 +33,35 @@ export default function PortalSingleOpp({material} : {material : THREE.Material}
         length,
         interaxleLength,
         roofIncline,
-        eavesHeight
+        eavesHeight,
+        overhangLeft
     });
 
     if (!requiredValues || !beamClipping.ready) return null;
 
     const isShed = pitches === "S" && pillars === 3;
-    const effPillars = 2;
+    const hasDoubleHeight = secondHeight !== undefined && requiredValues.pillars > 3;
+    const effPillars = isShed ? 2 : secondHeight !== undefined ? 2 : 0;
     const frames = (requiredValues.length / requiredValues.interaxleLength) + 1;
-    const firstCount = isShed ? effPillars * frames : frames;
-    const secondCount = isShed ? 0 : frames;
+    const firstCount = isShed
+        ? effPillars * frames
+        : secondHeight !== undefined
+            ? frames
+            : 0;
+    const secondCount = secondHeight !== undefined && !isShed ? frames : 0;
+    const outerLeftCount = requiredValues.overhangLeft < 1.5 ? frames : 0;
     const firstMaterial = isShed
         ? beamClipping.materials.primaryRight
+        : beamClipping.materials.primaryLeft;
+    const outerLeftMaterial = hasDoubleHeight
+        ? beamClipping.materials.outerLeft
         : beamClipping.materials.primaryLeft;
 
     const PILLARS = () => {
         useLayoutEffect(() => {
-            if (!firstRef.current) return;
+            if (firstCount > 0 && !firstRef.current) return;
             if (secondCount > 0 && !secondRef.current) return;
+            if (outerLeftCount > 0 && !outerLeftRef.current) return;
 
             const {pillars, pillarsHeight, width, length, interaxleLength, roofIncline, eavesHeight} = requiredValues;
             const mesh = new THREE.Object3D();
@@ -67,7 +81,10 @@ export default function PortalSingleOpp({material} : {material : THREE.Material}
                         height = pillarsHeight[index].totalHeight! - 1.03;
                     } else {
                         index = pillars / 2;
-                        height = eavesHeight - 1.01 - 0.25 + (roofIncline.percentage! * pillarsHeight[index - 1].position!) / 100;
+                        height = pillarsHeight[index].totalHeight!
+                            - secondHeight!
+                            - 1.01
+                            - 0.25;
                     }
                 }
 
@@ -83,14 +100,31 @@ export default function PortalSingleOpp({material} : {material : THREE.Material}
                     secondIndex++;
                 }
             }
+
+            if (outerLeftRef.current) {
+                const pillarIndex = 0;
+
+                for (let frame = 0; frame < frames; frame++) {
+                    mesh.position.set(
+                        pillarsHeight[pillarIndex].position! - (width / 2),
+                        pillarsHeight[pillarIndex].totalHeight! - 1.03,
+                        -interaxleLength * frame
+                    );
+                    mesh.rotation.set(Math.PI / 2, 0, 0);
+                    mesh.updateMatrix();
+                    (outerLeftRef.current as InstancedMesh).setMatrixAt(frame, mesh.matrix);
+                }
+            }
         }, []);
 
         return(
             <>
-                <instancedUniformsMesh
-                    ref={firstRef}
-                    args={[portalSGeometry, firstMaterial, firstCount]}>
-                </instancedUniformsMesh>
+                {firstCount > 0 &&
+                    <instancedUniformsMesh
+                        ref={firstRef}
+                        args={[portalSGeometry, firstMaterial, firstCount]}>
+                    </instancedUniformsMesh>
+                }
                 {secondCount > 0 &&
                     <instancedUniformsMesh
                         ref={secondRef}
@@ -99,6 +133,12 @@ export default function PortalSingleOpp({material} : {material : THREE.Material}
                             beamClipping.materials.outerRight,
                             secondCount
                         ]}>
+                    </instancedUniformsMesh>
+                }
+                {outerLeftCount > 0 &&
+                    <instancedUniformsMesh
+                        ref={outerLeftRef}
+                        args={[portalSGeometry, outerLeftMaterial, outerLeftCount]}>
                     </instancedUniformsMesh>
                 }
             </>

@@ -10,7 +10,7 @@ export default function CoveringLeftDH({material} : {material : THREE.Material})
     const coveringType = useMeasurementsStore((state: State) => state.coveringType.type);
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
-    const coveringLengthDH = useMeasurementsStore((state: State) => state.coveringLengthDH);
+    const coveringLeftLength = useMeasurementsStore((state: State) => state.coveringLeftLength);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
@@ -18,6 +18,8 @@ export default function CoveringLeftDH({material} : {material : THREE.Material})
     const secondCoveringLength = useMeasurementsStore((state: State) => state.secondCoveringLength);
     const secondRoofIncline = useMeasurementsStore((state: State) => state.secondRoofIncline);
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
 
     const coveringRef = useRef<InstancedMesh|null>(null);
     const coveringGeometry = coveringType === 'L'
@@ -33,12 +35,14 @@ export default function CoveringLeftDH({material} : {material : THREE.Material})
         length
     });
     const primaryRoofValues = getDefinedValues({
-        coveringLengthDH,
+        coveringLeftLength,
         eavesHeight,
         roofInclineRad: roofIncline.rad,
         width,
         length,
-        pillars
+        pillars,
+        overhangLeft,
+        overhangRight
     });
     const requiredValues = secondRoofValues ?? primaryRoofValues;
 
@@ -53,9 +57,9 @@ export default function CoveringLeftDH({material} : {material : THREE.Material})
         const {length} = requiredValues;
         const activeCoveringLength = secondRoofValues
             ? secondRoofValues.secondCoveringLength
-            : primaryRoofValues!.coveringLengthDH;
+            : primaryRoofValues!.coveringLeftLength;
         const xCount = coveringType === 'FC'
-            ? Math.max(1, Math.floor(activeCoveringLength))
+            ? Math.max(1, Math.ceil(activeCoveringLength))
             : 1;
         const zCount = Math.floor(length) + 1;
         const count = xCount * zCount;
@@ -72,10 +76,16 @@ export default function CoveringLeftDH({material} : {material : THREE.Material})
                 : primaryRoofValues!.roofInclineRad;
             const beamPosition = secondRoofValues
                 ? -(secondRoofValues.width / 2)
-                : -(primaryRoofValues!.width / 2);
+                : -(primaryRoofValues!.width / 2) - primaryRoofValues!.overhangLeft;
+            const heightOffset = secondRoofValues
+                ? 0
+                : Math.max(
+                    primaryRoofValues!.overhangRight - primaryRoofValues!.overhangLeft,
+                    0
+                ) * Math.tan(roofInclineRad);
             const coveringHeight = secondRoofValues
                 ? secondRoofValues.eavesHeight - purlinOffset
-                : primaryRoofValues!.eavesHeight - purlinOffset;
+                : primaryRoofValues!.eavesHeight + heightOffset - purlinOffset;
             coveringRef.current.geometry.computeBoundingBox();
             const shift = coveringRef.current.geometry.boundingBox!.max.x;
             coveringRef.current.geometry.translate(-shift, 0, 0);
@@ -86,7 +96,7 @@ export default function CoveringLeftDH({material} : {material : THREE.Material})
                 const zIndex = Math.floor(i / xCount);
 
                 mesh.scale.x = coveringType === 'FC'
-                    ? 1
+                    ? Math.min(1, Math.max(activeCoveringLength - xIndex, 0))
                     : !secondRoofValues
                         && primaryRoofValues!.pillars === 1
                         && pitches === 'D'

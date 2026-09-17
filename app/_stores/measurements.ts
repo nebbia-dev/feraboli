@@ -73,9 +73,6 @@ export const useMeasurementsStore = create<State>((set, get) => ({
                 state.domeType = measurements.dome;
                 state.purlinType = measurements.purlin;
                 state.purlinShape = measurements.purlinShape;
-                state.overhangRight = measurements.overhangRight;
-                state.overhangLeft = measurements.overhangLeft;
-
                 state.coveringType.type = measurements.coveringType;
                 if(measurements.coveringSubType !== '') {
                     state.coveringType.subType = measurements.coveringSubType;
@@ -150,10 +147,18 @@ export const useMeasurementsStore = create<State>((set, get) => ({
 
                 state.length = Number(measurements.length);
                 state.width = Number(measurements.width);
-                state.overhangRight = Number(measurements.overhangRight);
-                state.overhangLeft = Number(measurements.overhangLeft);
+                state.overhangRight = state.pillars === 10
+                    ? 0
+                    : Number(measurements.overhangRight);
+                state.overhangLeft = state.pillars === 10
+                    ? 0
+                    : Number(measurements.overhangLeft);
                 state.interaxleLength = Number(measurements.interaxleLength);
-                state.interaxleWidth = state.sails ? Number(measurements.width) / Number(state.sails) : Number(measurements.width) / Number(measurements.pillars);
+                state.interaxleWidth = state.sails
+                    ? Number(measurements.width) / Number(state.sails)
+                    : Number(measurements.pillars) === 1
+                        ? Number(measurements.width)
+                        : Number(measurements.width) / (Number(measurements.pillars) - 1);
 
                 get().setDerivedMeasurements(state);
             })),
@@ -163,22 +168,35 @@ export const useMeasurementsStore = create<State>((set, get) => ({
         state.secondHeightOffset = 0;
 
         if(state.width && state.roofIncline.percentage && state.pillars
-            && state.interaxleWidth && state.eavesHeight && state.overhangRight && state.overhangLeft) {
+            && state.interaxleWidth && state.eavesHeight
+            && state.overhangRight !== undefined && state.overhangLeft !== undefined) {
             state.pillarsHeight = [];
 
             const halfWidth = state.width / 2;
             const halfRight = halfWidth + state.overhangRight;
             const halfLeft = halfWidth + state.overhangLeft;
+            const roofHeightOffset = state.pillars === 10
+                ? 0
+                : Math.max(
+                    state.overhangLeft,
+                    state.overhangRight,
+                    0
+                ) * Math.tan(state.roofIncline.rad!);
 
             state.secondHeightOffset = state.secondHeight && state.pillars > 3 && state.pitches === 'DH'
-                ? (halfWidth - ((state.interaxleWidth / 2) + 0.5)) * Math.tan(state.roofIncline.rad!) + state.secondHeight
+                ? roofHeightOffset
+                    + (halfWidth - ((state.interaxleWidth / 2) + 0.5)) * Math.tan(state.roofIncline.rad!)
+                    + state.secondHeight
                 : 0;
 
-            // BEAM (PER ORA LE ECCEZIONI CONTINUANO A USARE HALFWIDTH)
+            // BEAM
+            // TEMP: da eliminare post-refactor
+            state.secondBeamMaxHeight = undefined;
+
             // EXCEPTION: 1 o 2 PILLARS MONO FALDA
             if(state.pillars < 3 && state.pitches?.includes('M')) {
-                state.beamMaxHeight = (state.roofIncline.percentage * state.width) / 100;
-                state.beamLength = Math.sqrt(Math.pow(state.beamMaxHeight, 2) + Math.pow(state.width, 2));
+                state.beamMaxHeight = (state.roofIncline.percentage * (state.width + state.overhangRight)) / 100;
+                state.beamLength = Math.sqrt(Math.pow(state.beamMaxHeight, 2) + Math.pow(state.width + state.overhangRight + state.overhangLeft, 2));
             // EXCEPTION: SAILS
             } else if(state.pillars === 10) {
                 const firstSpans = {beamLength: 0, beamMaxHeight: 0, halfPurlins: 0};
@@ -202,32 +220,31 @@ export const useMeasurementsStore = create<State>((set, get) => ({
                 state.spansInfo.beams = {firstSpans, middleSpans, nearCentralSpans, centralSpan};
 
                 // EXCEPTION: >4 PILLARS DOUBLE HEIGHT
-            } else if(state.pillars > 3 && state.pitches?.includes('D')) {
-                state.beamMaxHeight = (state.roofIncline.percentage * halfWidth) / 100;
-                state.beamRightLength = Math.sqrt(Math.pow(state.beamMaxHeight, 2) + Math.pow(halfRight, 2));
-                state.beamLeftLength = Math.sqrt(Math.pow(state.beamMaxHeight, 2) + Math.pow(halfLeft, 2));
+            } else if(state.pillars > 3 && state.pitches === 'DH') {
+                // Central raised roof, positioned using secondHeightOffset.
+                state.beamMaxHeight = (state.roofIncline.percentage * (state.interaxleWidth/2 + 0.5)) / 100;
+                state.beamLength = Math.sqrt(Math.pow(state.beamMaxHeight, 2) + Math.pow((state.interaxleWidth/2 + 0.5), 2));
 
-                state.beamMaxHeightDH = (state.roofIncline.percentage * (halfWidth - state.interaxleWidth/2)) / 100;
-                state.beamLengthDH = Math.sqrt(Math.pow(state.beamMaxHeightDH, 2) + Math.pow(halfWidth - state.interaxleWidth/2, 2));
-                state.coveringLengthDH = state.beamLengthDH;
-                state.halfPurlinsDH = Math.ceil(state.coveringLengthDH / 1.5);
-            // ALL OTHER CASES
+                // Outer roofs, with independent left and right overhangs.
+                state.beamMaxHeightDH = (state.roofIncline.percentage * halfWidth) / 100;
+                state.beamRightLength = Math.sqrt(Math.pow(state.beamMaxHeightDH, 2) + Math.pow(halfRight - state.interaxleWidth/2, 2));
+                state.beamLeftLength = Math.sqrt(Math.pow(state.beamMaxHeightDH, 2) + Math.pow(halfLeft - state.interaxleWidth/2, 2));
+
+                // 3 PILLARS + SHED
+            } else if(state.pitches === 'S' && state.secondRoofIncline.percentage) {
+                // quella a sinistra
+                state.secondBeamMaxHeight = (state.secondRoofIncline.percentage * halfWidth) / 100;
+                state.beamLeftLength = Math.sqrt(Math.pow(state.secondBeamMaxHeight, 2) + Math.pow(halfLeft, 2));
+
+                // quella a destra
+                state.beamMaxHeight = (state.roofIncline.percentage * halfWidth) / 100;
+                state.beamRightLength = Math.sqrt(Math.pow(state.beamMaxHeight, 2) + Math.pow(halfRight, 2));
+
+                // ALL OTHER CASES
             } else {
                 state.beamMaxHeight = (state.roofIncline.percentage * halfWidth) / 100;
                 state.beamRightLength = Math.sqrt(Math.pow(state.beamMaxHeight, 2) + Math.pow(halfRight, 2));
                 state.beamLeftLength = Math.sqrt(Math.pow(state.beamMaxHeight, 2) + Math.pow(halfLeft, 2));
-            }
-            // ADD-ON: 3 PILLARS + SHED
-            if(state.pitches === 'S' && state.secondRoofIncline.percentage) {
-                state.secondBeamMaxHeight = (state.secondRoofIncline.percentage * halfWidth) / 100;
-                state.secondBeamLength = Math.sqrt(Math.pow(state.secondBeamMaxHeight, 2) + Math.pow(halfWidth, 2)) + state.overhangLeft;
-                state.secondCoveringLength = state.secondBeamLength;
-                state.secondHalfPurlins = Math.ceil(state.secondCoveringLength / 1.5);
-            } else {
-                state.secondBeamMaxHeight = undefined;
-                state.secondBeamLength = undefined;
-                state.secondCoveringLength = undefined;
-                state.secondHalfPurlins = undefined;
             }
 
             // DOME
@@ -253,9 +270,19 @@ export const useMeasurementsStore = create<State>((set, get) => ({
             }
 
             // COVERING LENGTH
-            // EXCEPTIONS: 1 o 2 PILLARS MONOFALDA, 3 PILLARS + SHED
-            if(state.pitches && (state.pillars === 1 || (state.pillars === 2 && state.pitches.includes('M')))) {
+            // EXCEPTIONS: 1 o 2 PILLARS MONOFALDA
+            if(state.pitches && ((state.pillars === 1 || state.pillars === 2) && state.pitches.includes('M'))) {
                 state.coveringLength = state.beamLength;
+            } else if(state.pillars > 3 && state.pitches === 'DH') {
+                state.coveringLength = state.beamLength! - (state.domeWidth! / 2);
+                state.halfPurlinsDH = Math.ceil(state.coveringLength / 1.5);
+                state.coveringRightLength = state.beamRightLength;
+                state.coveringLeftLength = state.beamLeftLength;
+            } else if((state.pillars === 1 && state.pitches === 'D') || (state.pillars === 3 && state.pitches === 'S')) {
+                // With one central pillar there is no dome: both coverings reach
+                // the ridge and therefore use the complete beam length.
+                state.coveringRightLength = state.beamRightLength;
+                state.coveringLeftLength = state.beamLeftLength;
             // ALL OTHER CASES
             } else if(state.pillars !== 10){
                 state.coveringRightLength = state.beamRightLength! - (state.domeWidth! / 2);
@@ -264,7 +291,11 @@ export const useMeasurementsStore = create<State>((set, get) => ({
 
             if(state.pillars !== 10) {
                 state.halfRightPurlins = Math.ceil(state.coveringRightLength! / 1.5);
-                state.halfLeftPurlins = Math.ceil(state.coveringRightLength! / 1.5);
+                if(state.pitches && ((state.pillars === 1 || state.pillars === 2) && state.pitches.includes('M'))) {
+                    state.halfLeftPurlins = Math.ceil(state.coveringLength! / 1.5);
+                } else {
+                    state.halfLeftPurlins = Math.ceil(state.coveringLeftLength! / 1.5);
+                }
             }
 
             const halfPillars = Math.ceil(Number(state.pillars) / 2);
@@ -277,11 +308,16 @@ export const useMeasurementsStore = create<State>((set, get) => ({
                         position: undefined
                     };
                     // POSITION
-                    pillar.position = state.interaxleWidth/2 + (state.interaxleWidth * i);
+                    pillar.position = state.pillars === 10
+                        ? (state.interaxleWidth / 2) + (state.interaxleWidth * i)
+                        : state.pillars === 1
+                            ? halfWidth
+                            : state.interaxleWidth * i;
 
                     // HEIGHT
                     // EXCEPTION: SAILS
                     if(state.sails && state.pillars === 10) {
+                        const centralSailHeightOffset = 0.5;
 
                         if(state.spansRight && state.spansRight === 1 &&  state.spansLeft && state.spansLeft > 2) {
                                 if(i === 0) {
@@ -340,23 +376,48 @@ export const useMeasurementsStore = create<State>((set, get) => ({
                             }
                         }
 
+                        // Both supports of the central sail need the same extra
+                        // clearance. In the two-span layouts this is additional to
+                        // the existing offset required by their special geometry.
+                        const centralSailPillarIndex = state.spansRight;
+                        const isCentralSailPillar = state.spansLeft
+                            && centralSailPillarIndex !== undefined
+                            && (i === centralSailPillarIndex || i === centralSailPillarIndex + 1);
+
+                        if(isCentralSailPillar) {
+                            pillar.heightToAdd! += centralSailHeightOffset;
+                            pillar.totalHeight! += centralSailHeightOffset;
+                        }
+
                     // EXCEPTION: 2 PILLARS MONO FALDA
                     } else if(state.pitches && (state.pillars === 2 && state.pitches.includes('M'))) {
-                        pillar.heightToAdd = (state.roofIncline.percentage * pillar.position) / 100;
+                        pillar.heightToAdd = roofHeightOffset
+                            + (state.roofIncline.percentage * pillar.position) / 100;
                         pillar.totalHeight = state.eavesHeight + pillar.heightToAdd;
+
                     // EXCEPTION: 3 PILLARS SHED
                     } else if(state.pitches === 'S' && state.secondRoofIncline.percentage){
+                        const leftHeightOffset = Math.max(state.overhangRight - state.overhangLeft, 0)
+                            * Math.tan(state.roofIncline.rad!);
+                        const rightHeightOffset = Math.max(state.overhangLeft - state.overhangRight, 0)
+                            * Math.tan(state.roofIncline.rad!);
+
                         if(i < halfPillars) {
-                            pillar.heightToAdd = (state.secondRoofIncline.percentage * pillar.position) / 100;
+                            const distanceFromLeftEave = pillar.position + state.overhangLeft;
+                            pillar.heightToAdd = leftHeightOffset
+                                + distanceFromLeftEave * Math.tan(state.secondRoofIncline.rad!);
                         } else {
-                            pillar.heightToAdd = (state.roofIncline.percentage * state.pillarsHeight[0].position!) / 100;
+                            const distanceFromRightEave = state.width - pillar.position + state.overhangRight;
+                            pillar.heightToAdd = rightHeightOffset
+                                + distanceFromRightEave * Math.tan(state.roofIncline.rad!);
                         }
                         pillar.totalHeight = state.eavesHeight + pillar.heightToAdd;
 
                     // EXCEPTION: 3 PILLARS NORMAL
                     } else if(state.pillars === 3) {
                         if(i < halfPillars) {
-                            pillar.heightToAdd = (state.roofIncline.percentage * pillar.position) / 100;
+                            pillar.heightToAdd = roofHeightOffset
+                                + (state.roofIncline.percentage * pillar.position) / 100;
                             pillar.totalHeight = state.eavesHeight + pillar.heightToAdd;
                         } else {
                             pillar.heightToAdd = state.pillarsHeight[0].heightToAdd;
@@ -365,9 +426,12 @@ export const useMeasurementsStore = create<State>((set, get) => ({
                     } else {
                         if(i < halfPillars) {
                             if(state.secondHeight && i === halfPillars - 1) {
-                                pillar.heightToAdd = ((state.roofIncline.percentage * pillar.position) / 100) + state.secondHeight;
+                                pillar.heightToAdd = roofHeightOffset
+                                    + ((state.roofIncline.percentage * pillar.position) / 100)
+                                    + state.secondHeight;
                             } else {
-                                pillar.heightToAdd = (state.roofIncline.percentage * pillar.position) / 100;
+                                pillar.heightToAdd = roofHeightOffset
+                                    + (state.roofIncline.percentage * pillar.position) / 100;
                             }
                             pillar.totalHeight = state.eavesHeight + pillar.heightToAdd;
                         } else {

@@ -10,12 +10,14 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
     const coveringType = useMeasurementsStore((state: State) => state.coveringType.type);
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
-    const coveringLengthDH = useMeasurementsStore((state: State) => state.coveringLengthDH);
+    const coveringRightLength = useMeasurementsStore((state: State) => state.coveringRightLength);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
 
     const coveringRef = useRef<InstancedMesh|null>(null);
     const coveringGeometry = coveringType === 'L'
@@ -24,12 +26,14 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
             ? baseModel?.coveringFCRight
             : baseModel?.coveringRight;
     const requiredValues = getDefinedValues({
-        coveringLengthDH,
+        coveringRightLength,
         eavesHeight,
         roofInclineRad: roofIncline.rad,
         width,
         length,
-        pillars
+        pillars,
+        overhangLeft,
+        overhangRight
     });
 
     if (
@@ -41,9 +45,9 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
     }
 
     const COVERINGRIGHT = () => {
-        const {coveringLengthDH, length} = requiredValues;
+        const {coveringRightLength, length} = requiredValues;
         const xCount = coveringType === 'FC'
-            ? Math.max(1, Math.floor(coveringLengthDH))
+            ? Math.max(1, Math.ceil(coveringRightLength))
             : 1;
         const zCount = Math.floor(length) + 1;
         const count = xCount * zCount;
@@ -54,8 +58,10 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
                 return;
             }
 
-            const {coveringLengthDH, eavesHeight, roofInclineRad, width, pillars} = requiredValues;
+            const {coveringRightLength, eavesHeight, roofInclineRad, width, pillars, overhangLeft, overhangRight} = requiredValues;
             const mesh = new THREE.Object3D();
+            const heightOffset = Math.max(overhangLeft - overhangRight, 0)
+                * Math.tan(roofInclineRad);
             coveringRef.current.geometry.computeBoundingBox();
             const shift = coveringRef.current.geometry.boundingBox!.min.x;
             coveringRef.current.geometry.translate(-shift, 0, 0);
@@ -66,11 +72,15 @@ export default function CoveringRightDH({material} : {material : THREE.Material}
                 const zIndex = Math.floor(i / xCount);
 
                 mesh.scale.x = coveringType === 'FC'
-                    ? 1
+                    ? Math.min(1, Math.max(coveringRightLength - xIndex, 0))
                     : pillars === 1 && pitches === 'D'
-                        ? coveringLengthDH + 1
-                        : coveringLengthDH;
-                mesh.position.set(width / 2, eavesHeight - purlinOffset, -zIndex);
+                        ? coveringRightLength + 1
+                        : coveringRightLength;
+                mesh.position.set(
+                    (width / 2) + overhangRight,
+                    eavesHeight + heightOffset - purlinOffset,
+                    -zIndex
+                );
                 mesh.rotation.set(0, Math.PI, roofInclineRad);
                 mesh.translateX(xIndex);
                 mesh.updateMatrix();

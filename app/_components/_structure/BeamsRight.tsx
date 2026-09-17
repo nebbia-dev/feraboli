@@ -8,6 +8,7 @@ import {getDefinedValues} from "@/app/_utils/getDefinedValues";
 export default  function BeamsRight({material} : {material : THREE.Material}) {
     const baseModel = useMeasurementsStore((state: State) => state.geometry);
     const pillars = useMeasurementsStore((state: State) => state.pillars);
+    const beamLength = useMeasurementsStore((state: State) => state.beamLength);
     const beamRightLength = useMeasurementsStore((state: State) => state.beamRightLength);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
@@ -19,12 +20,13 @@ export default  function BeamsRight({material} : {material : THREE.Material}) {
     const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
     const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
     const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
-    const beamLeftLength = useMeasurementsStore((state: State) => state.beamLeftLength);
 
     const ref = useRef<THREE.Mesh|null>(null);
     const beamGeometry = baseModel?.beamsRight;
+    const isDoubleHeight = pillars !== undefined && pillars > 3 && pitches === 'DH';
+    const activeBeamLength = isDoubleHeight ? beamLength : beamRightLength;
     const requiredValues = getDefinedValues({
-        beamRightLength,
+        activeBeamLength,
         eavesHeight,
         roofInclineRad: roofIncline.rad,
         width,
@@ -43,8 +45,10 @@ export default  function BeamsRight({material} : {material : THREE.Material}) {
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {beamRightLength, eavesHeight, roofInclineRad, width, length, interaxleLength, pillars, overhangRight, overhangLeft} = requiredValues;
-            const hoverhang = overhangLeft > overhangRight ? (overhangLeft - overhangRight) : 0;
+            const {activeBeamLength, eavesHeight, roofInclineRad, width, length, interaxleLength, pillars, overhangRight, overhangLeft} = requiredValues;
+            const hoverhang = !isDoubleHeight && overhangLeft > overhangRight
+                ? overhangLeft - overhangRight
+                : 0;
             const hta = hoverhang * Math.tan(roofInclineRad);
             const mesh = new THREE.Object3D();
             const beamPosition = (interaxleWidth && pillars > 3 && pitches === 'DH')
@@ -52,7 +56,7 @@ export default  function BeamsRight({material} : {material : THREE.Material}) {
                                             : (width / 2) + overhangRight
 
             for (let i = 0; i < (length / interaxleLength) + 1; i++) {
-                mesh.scale.x = beamRightLength + 1;
+                mesh.scale.x = activeBeamLength + 1;
                 const shift = ref.current.geometry.boundingBox!.max.x;
                 ref.current.geometry.translate(-shift, 0, 0);
                 mesh.position.set(beamPosition, eavesHeight + hta + secondHeightOffset, -interaxleLength * i);

@@ -10,29 +10,43 @@ export default function PurlinsLeft({material} : {material : THREE.Material}) {
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
     const halfPurlins = useMeasurementsStore((state: State) => state.halfPurlins);
+    const halfPurlinsDH = useMeasurementsStore((state: State) => state.halfPurlinsDH);
+    const halfLeftPurlins = useMeasurementsStore((state: State) => state.halfLeftPurlins);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
     const coveringLength = useMeasurementsStore((state: State) => state.coveringLength);
+    const coveringLeftLength = useMeasurementsStore((state: State) => state.coveringLeftLength);
     const secondRoofIncline = useMeasurementsStore((state: State) => state.secondRoofIncline);
     const secondCoveringLength = useMeasurementsStore((state: State) => state.secondCoveringLength);
     const secondHalfPurlins = useMeasurementsStore((state: State) => state.secondHalfPurlins);
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
 
     const ref = useRef<THREE.Mesh|null>(null);
     const purlinGeometry = baseModel?.purlinsLeft;
-    const hP = secondHalfPurlins ? secondHalfPurlins : halfPurlins;
+    const isDoubleHeight = pillars !== undefined && pillars > 3 && pitches === 'DH';
+    const primaryHalfPurlins = isDoubleHeight
+        ? halfPurlinsDH
+        : halfLeftPurlins ?? halfPurlins;
+    const primaryCoveringLength = isDoubleHeight
+        ? coveringLength
+        : coveringLeftLength ?? coveringLength;
+    const hP = secondHalfPurlins ?? primaryHalfPurlins;
     const requiredValues = getDefinedValues({
         hP,
         eavesHeight,
-        coveringLength,
+        primaryCoveringLength,
         roofInclineRad: roofIncline.rad,
         width,
         length,
-        pillars
+        pillars,
+        overhangRight,
+        overhangLeft
     });
 
     if (!requiredValues) return null;
@@ -41,14 +55,21 @@ export default function PurlinsLeft({material} : {material : THREE.Material}) {
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {hP, eavesHeight, coveringLength, roofInclineRad, width, length, pillars} = requiredValues;
-            const cL = secondCoveringLength ? secondCoveringLength : coveringLength;
+            const {hP, eavesHeight, primaryCoveringLength, roofInclineRad, width, length, pillars, overhangRight, overhangLeft} = requiredValues;
+            const cL = secondCoveringLength ?? primaryCoveringLength;
             const roofRad = secondRoofIncline.rad ?? roofInclineRad;
             const mesh = new THREE.Object3D();
 
+            const hoverhang = !isDoubleHeight && overhangLeft < overhangRight
+                ? overhangRight - overhangLeft
+                : 0;
+
+            const hta = hoverhang * Math.tan(roofInclineRad);
+
             const beamPosition = (interaxleWidth && pillars > 3 && pitches === 'DH')
                 ? -(interaxleWidth / 2) - 0.5
-                : -(width / 2)
+                : -(width / 2) - overhangLeft
+
 
             const base = cL * Math.cos(roofRad);
             const height = (cL - 0.1) * Math.sin(roofRad);
@@ -61,12 +82,12 @@ export default function PurlinsLeft({material} : {material : THREE.Material}) {
                 const h = ((purlinGap * i) - 0.1) * Math.sin(roofRad);
                 const b = Math.sqrt(Math.pow((purlinGap * i), 2) - Math.pow(h, 2))
                 const purlinHeight = i === 0
-                                                ? eavesHeight - purlinOffset + secondHeightOffset
+                                                ? eavesHeight + hta - purlinOffset + secondHeightOffset
                                                 : i === hP - 1 && secondCoveringLength
-                                                    ? eavesHeight + height - 0.1 - purlinOffset + secondHeightOffset
+                                                    ? eavesHeight + hta + height - 0.1 - purlinOffset + secondHeightOffset
                                                     : i === hP - 1
-                                                        ? eavesHeight + height - purlinOffset + secondHeightOffset
-                                                        : eavesHeight + h - purlinOffset + secondHeightOffset;
+                                                        ? eavesHeight + hta + height - purlinOffset + secondHeightOffset
+                                                        : eavesHeight + hta + h - purlinOffset + secondHeightOffset;
 
                 const purlinPos = i === 0
                                             ? beamPosition

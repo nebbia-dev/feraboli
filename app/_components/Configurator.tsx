@@ -58,6 +58,7 @@ import DomePurlinsOmegaCentral from "@/app/_components/_structure/DomePurlinsOme
 import DomePurlinsOmegaLeft from "@/app/_components/_structure/DomePurlinsOmegaLeft";
 import DomePurlinsOmegaRight from "@/app/_components/_structure/DomePurlinsOmegaRight";
 import DomePurlinsOmegaMono from "@/app/_components/_structure/DomePurlinsOmegaMono";
+import {getDomeElevationOffset} from "@/app/_utils/getDomeElevationOffset";
 extend({InstancedUniformsMesh});
 
 export default function Configurator() {
@@ -70,6 +71,22 @@ export default function Configurator() {
     const domeType = useMeasurementsStore((state: State) => state.domeType);
     const secondHeight = useMeasurementsStore((state: State) => state.secondHeight);
     const purlinShape = useMeasurementsStore((state: State) => state.purlinShape);
+    const roofInclineRad = useMeasurementsStore((state: State) => state.roofIncline.rad);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
+
+    const domeElevationOffset = getDomeElevationOffset({
+        pillars,
+        pitches,
+        roofInclineRad,
+        overhangLeft,
+        overhangRight
+    });
+
+    const hasShortOuterOverhang = pillars !== 1 && (
+        (overhangLeft !== undefined && overhangLeft < 1.5)
+        || (overhangRight !== undefined && overhangRight < 1.5)
+    );
 
     const setGeometry = useMeasurementsStore((state: State) => state.setGeometry);
 
@@ -138,42 +155,44 @@ export default function Configurator() {
 
             {pillars && pillars !== 10 &&
                 <>
-                    {domeType === 'S'
-                        ? <>
-                            <DomeCoveringMono material={redMatcapMaterial}/>
-                            {purlinShape === 'c'
-                                ? <DomePurlinsMono material={matcapMaterial}/>
-                                : <DomePurlinsOmegaMono material={matcapMaterial}/>
-                            }
-                            <DomeBeamMono material={matcapMaterial}/>
-                        </>
-                        : <>
-                            {domeType === 'SP'
-                                ? <DomeCoveringSpherical material={redMatcapMaterial}/>
-                                : <>
-                                    <DomeCoveringLeft material={domeType === 'DT' ? redMatcapMaterialClippedLeftTransp : redMatcapMaterialClippedLeft}/>
-                                    <DomeCoveringRight material={domeType === 'DT' ? redMatcapMaterialClippedRightTransp : redMatcapMaterialClippedRight}/>
-                                  </>
-                            }
-                            {purlinShape === 'c'
-                                ? <>
-                                    <DomePurlinsCentral material={matcapMaterial}/>
-                                    <DomePurlinsLeft material={matcapMaterial}/>
-                                    <DomePurlinsRight material={matcapMaterial}/>
-                                  </>
-                                : <>
-                                    <DomePurlinsOmegaCentral material={matcapMaterial}/>
-                                    <DomePurlinsOmegaLeft material={matcapMaterial}/>
-                                    <DomePurlinsOmegaRight material={matcapMaterial}/>
-                                  </>
-                            }
-                            <DomeBeamsLeft material={matcapMaterialClippedLeft}/>
-                            <DomeBeamsRight material={matcapMaterialClippedRight}/>
-                          </>
-                    }
+                    <group position={[0, domeElevationOffset, 0]}>
+                        {domeType === 'S'
+                            ? <>
+                                <DomeCoveringMono material={redMatcapMaterial}/>
+                                {purlinShape === 'c'
+                                    ? <DomePurlinsMono material={matcapMaterial}/>
+                                    : <DomePurlinsOmegaMono material={matcapMaterial}/>
+                                }
+                                <DomeBeamMono material={matcapMaterial}/>
+                            </>
+                            : <>
+                                {domeType === 'SP'
+                                    ? <DomeCoveringSpherical material={redMatcapMaterial}/>
+                                    : <>
+                                        <DomeCoveringLeft material={domeType === 'DT' ? redMatcapMaterialClippedLeftTransp : redMatcapMaterialClippedLeft}/>
+                                        <DomeCoveringRight material={domeType === 'DT' ? redMatcapMaterialClippedRightTransp : redMatcapMaterialClippedRight}/>
+                                      </>
+                                }
+                                {purlinShape === 'c'
+                                    ? <>
+                                        <DomePurlinsCentral material={matcapMaterial}/>
+                                        <DomePurlinsLeft material={matcapMaterial}/>
+                                        <DomePurlinsRight material={matcapMaterial}/>
+                                      </>
+                                    : <>
+                                        <DomePurlinsOmegaCentral material={matcapMaterial}/>
+                                        <DomePurlinsOmegaLeft material={matcapMaterial}/>
+                                        <DomePurlinsOmegaRight material={matcapMaterial}/>
+                                      </>
+                                }
+                                <DomeBeamsLeft material={matcapMaterialClippedLeft}/>
+                                <DomeBeamsRight material={matcapMaterialClippedRight}/>
+                              </>
+                        }
 
-                    <DomePillarsRight material={matcapMaterial}/>
-                    <DomePillarsLeft material={matcapMaterial}/>
+                        <DomePillarsRight material={matcapMaterial}/>
+                        <DomePillarsLeft material={matcapMaterial}/>
+                    </group>
 
                     {
                         pitches === 'DH' && secondHeight &&
@@ -231,12 +250,12 @@ export default function Configurator() {
                     }
 
                     {
-                        structureType === 'portal' && (secondHeight || (pitches === 'S' && pillars === 3))
+                        structureType === 'portal' && (secondHeight || (pitches === 'S' && pillars === 3) || hasShortOuterOverhang)
                             ? <>
                                 <PortalSingle material={matcapMaterial}/>
                                 <PortalSingleOpp material={matcapMaterial}/>
                             </>
-                            : structureType === 'struts' && (secondHeight || (pitches === 'S' && pillars === 3))
+                            : structureType === 'struts' && (secondHeight || (pitches === 'S' && pillars === 3) || hasShortOuterOverhang)
                                 ?
                                 <>
                                     <StrutsSingle material={matcapMaterial}/>

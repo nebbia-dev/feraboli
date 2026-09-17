@@ -4,12 +4,14 @@ import {InstancedMesh} from "three";
 import {useMeasurementsStore} from "@/app/_stores/measurements";
 import {State} from "@/app/_types/State";
 import {getDefinedValues} from "@/app/_utils/getDefinedValues";
+import {getDomeElevationOffset} from "@/app/_utils/getDomeElevationOffset";
 
 export default function DomePillarsRight({material} : {material : THREE.Material}) {
     const baseModel = useMeasurementsStore((state: State) => state.geometry);
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
     const coveringLength = useMeasurementsStore((state: State) => state.coveringLength);
+    const coveringRightLength = useMeasurementsStore((state: State) => state.coveringRightLength);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
@@ -19,9 +21,23 @@ export default function DomePillarsRight({material} : {material : THREE.Material
     const domeType = useMeasurementsStore((state: State) => state.domeType);
     const beamMaxHeight = useMeasurementsStore((state: State) => state.beamMaxHeight);
     const beamLength = useMeasurementsStore((state: State) => state.beamLength);
+    const beamRightLength = useMeasurementsStore((state: State) => state.beamRightLength);
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
+
+    const isDoubleHeight = pillars !== undefined && pillars > 3 && pitches === 'DH';
+    const activeBeamLength = isDoubleHeight ? beamLength : beamRightLength;
+    const activeCoveringLength = isDoubleHeight ? coveringLength : coveringRightLength;
+    const domeElevationOffset = getDomeElevationOffset({
+        pillars,
+        pitches,
+        roofInclineRad: roofIncline.rad,
+        overhangLeft,
+        overhangRight
+    });
 
     const pillarNumber = (width && length && interaxleLength)
                                                 ? (width >= 35 ? ((length / interaxleLength) + 1) * 2 : (length / interaxleLength) + 1)
@@ -36,19 +52,20 @@ export default function DomePillarsRight({material} : {material : THREE.Material
     const materialClippedRoof = material.clone();
     materialClippedRoof.clippingPlanes = [localPlaneInclined];
     const requiredValues = getDefinedValues({
-        coveringLength,
+        coveringLength: activeCoveringLength,
         eavesHeight,
         roofInclinePercentage: roofIncline.percentage,
         roofInclineRad: roofIncline.rad,
         width,
         interaxleLength,
-        beamLength,
+        beamLength: activeBeamLength,
         beamMaxHeight,
         domeHeight,
         domeWidth,
         domeType,
         pillarNumber,
         pillars,
+        domeElevationOffset,
         domeBeamBoundingBox: domeBeamGeometry?.boundingBox,
         mainBeamBoundingBox: mainBeamGeometry?.boundingBox
     });
@@ -73,6 +90,7 @@ export default function DomePillarsRight({material} : {material : THREE.Material
                 domeType,
                 pillarNumber,
                 pillars,
+                domeElevationOffset,
                 domeBeamBoundingBox,
                 mainBeamBoundingBox
             } = requiredValues;
@@ -128,7 +146,7 @@ export default function DomePillarsRight({material} : {material : THREE.Material
                 new THREE.Vector3(
                     isMonoDome ? domeWidth / 2 : 0.05,
                     eavesHeight + beamMaxHeight + secondHeightOffset + domeHeight + 0.25 +
-                        (isMonoDome ? hToAdd : 0),
+                        (isMonoDome ? hToAdd : 0) + domeElevationOffset,
                     0
                 ),
                 new THREE.Quaternion().setFromEuler(

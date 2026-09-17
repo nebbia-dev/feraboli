@@ -10,11 +10,14 @@ export default function PurlinsOmegaLeft({material} : {material : THREE.Material
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
     const halfPurlins = useMeasurementsStore((state: State) => state.halfPurlins);
+    const halfPurlinsDH = useMeasurementsStore((state: State) => state.halfPurlinsDH);
+    const halfLeftPurlins = useMeasurementsStore((state: State) => state.halfLeftPurlins);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
     const coveringLength = useMeasurementsStore((state: State) => state.coveringLength);
+    const coveringLeftLength = useMeasurementsStore((state: State) => state.coveringLeftLength);
     const secondRoofIncline = useMeasurementsStore((state: State) => state.secondRoofIncline);
     const secondCoveringLength = useMeasurementsStore((state: State) => state.secondCoveringLength);
     const secondHalfPurlins = useMeasurementsStore((state: State) => state.secondHalfPurlins);
@@ -24,11 +27,18 @@ export default function PurlinsOmegaLeft({material} : {material : THREE.Material
 
     const ref = useRef<THREE.Mesh|null>(null);
     const purlinGeometry = baseModel?.purlinsOmega;
-    const hP = secondHalfPurlins ? secondHalfPurlins : halfPurlins;
+    const isDoubleHeight = pillars !== undefined && pillars > 3 && pitches === 'DH';
+    const primaryHalfPurlins = isDoubleHeight
+        ? halfPurlinsDH
+        : halfLeftPurlins ?? halfPurlins;
+    const primaryCoveringLength = isDoubleHeight
+        ? coveringLength
+        : coveringLeftLength ?? coveringLength;
+    const hP = secondHalfPurlins ?? primaryHalfPurlins;
     const requiredValues = getDefinedValues({
         hP,
         eavesHeight,
-        coveringLength,
+        primaryCoveringLength,
         roofInclineRad: roofIncline.rad,
         width,
         length,
@@ -41,8 +51,8 @@ export default function PurlinsOmegaLeft({material} : {material : THREE.Material
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {hP, eavesHeight, coveringLength, roofInclineRad, width, length, pillars} = requiredValues;
-            const cL = secondCoveringLength ? secondCoveringLength : coveringLength;
+            const {hP, eavesHeight, primaryCoveringLength, roofInclineRad, width, length, pillars} = requiredValues;
+            const cL = secondCoveringLength ?? primaryCoveringLength;
             const roofRad = secondRoofIncline.rad ?? roofInclineRad;
             const mesh = new THREE.Object3D();
 

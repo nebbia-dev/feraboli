@@ -10,7 +10,8 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
     const beamLength = useMeasurementsStore((state: State) => state.beamLength);
-    const beamLengthDH = useMeasurementsStore((state: State) => state.beamLengthDH);
+    const beamLeftLength = useMeasurementsStore((state: State) => state.beamLeftLength);
+    const beamRightLength = useMeasurementsStore((state: State) => state.beamRightLength);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const pillarsHeight = useMeasurementsStore((state: State) => state.pillarsHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
@@ -22,6 +23,8 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeight = useMeasurementsStore((state: State) => state.secondHeight);
     const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
 
     const primaryLeftRef = useRef<THREE.Mesh|null>(null);
     const primaryRightRef = useRef<THREE.Mesh|null>(null);
@@ -62,7 +65,7 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
         beamBoundingBox: beamGeometry?.boundingBox
     });
     const doubleHeightValues = secondHeight !== undefined
-        ? getDefinedValues({beamLengthDH})
+        ? getDefinedValues({beamLeftLength, beamRightLength, overhangLeft, overhangRight})
         : undefined;
     const requiredValues = primaryRoofValues;
 
@@ -194,19 +197,35 @@ export default function TieBeamVert({material} : {material : THREE.Material}) {
                     .applyMatrix4(rightBeamMatrix);
 
                 if (hasSecondHeight && doubleHeightValues) {
+                    const outerLeftHeightOffset = Math.max(
+                        doubleHeightValues.overhangRight - doubleHeightValues.overhangLeft,
+                        0
+                    ) * Math.tan(roofInclineRad);
+                    const outerRightHeightOffset = Math.max(
+                        doubleHeightValues.overhangLeft - doubleHeightValues.overhangRight,
+                        0
+                    ) * Math.tan(roofInclineRad);
                     const outerLeftBeamMatrix = new THREE.Matrix4().compose(
-                        new THREE.Vector3(-(width / 2), eavesHeight, 0),
+                        new THREE.Vector3(
+                            -(width / 2) - doubleHeightValues.overhangLeft,
+                            eavesHeight + outerLeftHeightOffset,
+                            0
+                        ),
                         new THREE.Quaternion().setFromEuler(
                             new THREE.Euler(0, Math.PI, -roofInclineRad)
                         ),
-                        new THREE.Vector3(doubleHeightValues.beamLengthDH, 1, 1)
+                        new THREE.Vector3(doubleHeightValues.beamLeftLength, 1, 1)
                     );
                     const outerRightBeamMatrix = new THREE.Matrix4().compose(
-                        new THREE.Vector3(width / 2, eavesHeight, 0),
+                        new THREE.Vector3(
+                            (width / 2) + doubleHeightValues.overhangRight,
+                            eavesHeight + outerRightHeightOffset,
+                            0
+                        ),
                         new THREE.Quaternion().setFromEuler(
                             new THREE.Euler(0, 0, -roofInclineRad)
                         ),
-                        new THREE.Vector3(doubleHeightValues.beamLengthDH, 1, 1)
+                        new THREE.Vector3(doubleHeightValues.beamRightLength, 1, 1)
                     );
 
                     outerPlaneLeft

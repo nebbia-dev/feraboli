@@ -16,9 +16,12 @@ export default function StrutsSingle({material} : {material : THREE.Material}) {
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
+    const secondHeight = useMeasurementsStore((state: State) => state.secondHeight);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
 
     const firstRef = useRef<THREE.Mesh|null>(null);
     const secondRef = useRef<THREE.Mesh|null>(null);
+    const outerRightRef = useRef<THREE.Mesh|null>(null);
     const strutsSGeometry = baseModel?.capitalStrutsS;
     const beamClipping = useBeamClippingMaterials(material);
 
@@ -30,26 +33,33 @@ export default function StrutsSingle({material} : {material : THREE.Material}) {
         length,
         interaxleLength,
         roofIncline,
-        eavesHeight
+        eavesHeight,
+        overhangRight
     });
 
     if (!requiredValues || !beamClipping.ready) return null;
 
     const isShed = pitches === "S" && pillars === 3;
-    const effPillars = isShed ? 1 : 2;
+    const hasDoubleHeight = secondHeight !== undefined && requiredValues.pillars > 3;
+    const effPillars = isShed ? 1 : secondHeight !== undefined ? 2 : 0;
     const frames = (requiredValues.length / requiredValues.interaxleLength) + 1;
-    const firstCount = frames;
-    const secondCount = isShed ? 0 : frames;
+    const firstCount = effPillars > 0 ? frames : 0;
+    const secondCount = secondHeight !== undefined && !isShed ? frames : 0;
+    const outerRightCount = requiredValues.overhangRight < 1.5 ? frames : 0;
     const firstMaterial = isShed
         ? beamClipping.materials.primaryLeft
         : beamClipping.materials.outerLeft;
+    const outerRightMaterial = hasDoubleHeight
+        ? beamClipping.materials.outerRight
+        : beamClipping.materials.primaryRight;
 
     const PILLARS = () => {
         useLayoutEffect(() => {
-            if (!firstRef.current) return;
+            if (firstCount > 0 && !firstRef.current) return;
             if (secondCount > 0 && !secondRef.current) return;
+            if (outerRightCount > 0 && !outerRightRef.current) return;
 
-            const {pillars, pillarsHeight, width, length, interaxleLength, roofIncline, eavesHeight} = requiredValues;
+            const {pillars, pillarsHeight, width, length, interaxleLength} = requiredValues;
             const mesh = new THREE.Object3D();
             let firstIndex = 0;
             let secondIndex = 0;
@@ -64,7 +74,10 @@ export default function StrutsSingle({material} : {material : THREE.Material}) {
                 } else {
                     if(remainder === 0) {
                         index = (pillars / 2) - 1;
-                        height = eavesHeight - 1.01 - 0.25 + (roofIncline.percentage! * pillarsHeight[index].position!) / 100;
+                        height = pillarsHeight[index].totalHeight!
+                            - secondHeight!
+                            - 1.01
+                            - 0.25;
                     } else {
                         index = pillars / 2;
                         height = pillarsHeight[index].totalHeight! - 1.03;
@@ -83,14 +96,31 @@ export default function StrutsSingle({material} : {material : THREE.Material}) {
                     secondIndex++;
                 }
             }
+
+            if (outerRightRef.current) {
+                const pillarIndex = pillars - 1;
+
+                for (let frame = 0; frame < frames; frame++) {
+                    mesh.position.set(
+                        pillarsHeight[pillarIndex].position! - (width / 2),
+                        pillarsHeight[pillarIndex].totalHeight! - 1.03,
+                        -interaxleLength * frame
+                    );
+                    mesh.rotation.set(Math.PI / 2, 0, 0);
+                    mesh.updateMatrix();
+                    (outerRightRef.current as InstancedMesh).setMatrixAt(frame, mesh.matrix);
+                }
+            }
         }, []);
 
         return(
             <>
-                <instancedUniformsMesh
-                    ref={firstRef}
-                    args={[strutsSGeometry, firstMaterial, firstCount]}>
-                </instancedUniformsMesh>
+                {firstCount > 0 &&
+                    <instancedUniformsMesh
+                        ref={firstRef}
+                        args={[strutsSGeometry, firstMaterial, firstCount]}>
+                    </instancedUniformsMesh>
+                }
                 {secondCount > 0 &&
                     <instancedUniformsMesh
                         ref={secondRef}
@@ -99,6 +129,12 @@ export default function StrutsSingle({material} : {material : THREE.Material}) {
                             beamClipping.materials.primaryRight,
                             secondCount
                         ]}>
+                    </instancedUniformsMesh>
+                }
+                {outerRightCount > 0 &&
+                    <instancedUniformsMesh
+                        ref={outerRightRef}
+                        args={[strutsSGeometry, outerRightMaterial, outerRightCount]}>
                     </instancedUniformsMesh>
                 }
             </>

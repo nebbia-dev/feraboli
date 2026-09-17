@@ -10,12 +10,12 @@ export default function CoveringLeft({material} : {material : THREE.Material}) {
     const coveringType = useMeasurementsStore((state: State) => state.coveringType.type);
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
+    const coveringLength = useMeasurementsStore((state: State) => state.coveringLength);
     const coveringLeftLength = useMeasurementsStore((state: State) => state.coveringLeftLength);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
-    const secondCoveringLength = useMeasurementsStore((state: State) => state.secondCoveringLength);
     const secondRoofIncline = useMeasurementsStore((state: State) => state.secondRoofIncline);
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
@@ -29,26 +29,27 @@ export default function CoveringLeft({material} : {material : THREE.Material}) {
         : coveringType === 'FC'
             ? baseModel?.coveringFCLeft
             : baseModel?.coveringLeft;
-    const secondRoofValues = getDefinedValues({
-        secondCoveringLength,
-        eavesHeight,
-        secondRoofInclineRad: secondRoofIncline.rad,
-        width,
-        length,
-        overhangRight,
-        overhangLeft
-    });
+    const isDoubleHeight = pillars !== undefined && pillars > 3 && pitches === 'DH';
+    const isShed = pillars === 3 && pitches === 'S';
+    const activePrimaryCoveringLength = isDoubleHeight
+        || (pillars !== undefined && pillars < 3 && pitches?.includes('M'))
+            ? coveringLength
+            : coveringLeftLength;
+    const activeRoofInclineRad = isShed
+        ? secondRoofIncline.rad
+        : roofIncline.rad;
     const primaryRoofValues = getDefinedValues({
-        coveringLeftLength,
+        activePrimaryCoveringLength,
         eavesHeight,
-        roofInclineRad: roofIncline.rad,
+        activeRoofInclineRad,
+        mainRoofInclineRad: roofIncline.rad,
         width,
         length,
         pillars,
         overhangRight,
         overhangLeft
     });
-    const requiredValues = secondRoofValues ?? primaryRoofValues;
+    const requiredValues = primaryRoofValues;
 
     if (
         !requiredValues
@@ -59,11 +60,14 @@ export default function CoveringLeft({material} : {material : THREE.Material}) {
 
     const COVERINGLEFT = () => {
         const {length} = requiredValues;
-        const activeCoveringLength = secondRoofValues
-            ? secondRoofValues.secondCoveringLength
-            : primaryRoofValues!.coveringLeftLength;
+        const activeCoveringLength = primaryRoofValues!.activePrimaryCoveringLength;
+        const extendsToCenterClippingPlane = isShed
+            || (primaryRoofValues!.pillars === 1 && pitches === 'D');
+        const renderedCoveringLength = extendsToCenterClippingPlane
+            ? activeCoveringLength + 1
+            : activeCoveringLength;
         const xCount = coveringType === 'FC'
-            ? Math.max(1, Math.floor(activeCoveringLength))
+            ? Math.max(1, Math.ceil(renderedCoveringLength))
             : 1;
         const zCount = Math.floor(length) + 1;
         const count = xCount * zCount;
@@ -74,24 +78,20 @@ export default function CoveringLeft({material} : {material : THREE.Material}) {
                 return;
             }
             const {overhangRight, overhangLeft} = requiredValues;
-            const hoverhang = overhangLeft < overhangRight ?  (overhangRight - overhangLeft) : 0;
+            const hoverhang = !isDoubleHeight && overhangLeft < overhangRight
+                ? overhangRight - overhangLeft
+                : 0;
 
             const mesh = new THREE.Object3D();
-            const roofInclineRad = secondRoofValues
-                ? secondRoofValues.secondRoofInclineRad
-                : primaryRoofValues!.roofInclineRad;
+            const roofInclineRad = primaryRoofValues!.activeRoofInclineRad;
 
-            const beamPosition = secondRoofValues
-                ? -(secondRoofValues.width / 2)
-                : (interaxleWidth && primaryRoofValues!.pillars > 3 && pitches === 'DH')
+            const beamPosition = (interaxleWidth && primaryRoofValues!.pillars > 3 && pitches === 'DH')
                     ? -(interaxleWidth / 2) - 0.5
                     : -(primaryRoofValues!.width / 2) - overhangLeft;
 
-            const hta = hoverhang * Math.tan(roofInclineRad);
+            const hta = hoverhang * Math.tan(primaryRoofValues!.mainRoofInclineRad);
 
-            const coveringHeight = secondRoofValues
-                ? secondRoofValues.eavesHeight - purlinOffset
-                : primaryRoofValues!.eavesHeight + hta - purlinOffset + secondHeightOffset;
+            const coveringHeight = primaryRoofValues!.eavesHeight + hta - purlinOffset + secondHeightOffset;
             coveringRef.current.geometry.computeBoundingBox();
             const shift = coveringRef.current.geometry.boundingBox!.max.x;
             coveringRef.current.geometry.translate(-shift, 0, 0);
@@ -102,12 +102,8 @@ export default function CoveringLeft({material} : {material : THREE.Material}) {
                 const zIndex = Math.floor(i / xCount);
 
                 mesh.scale.x = coveringType === 'FC'
-                    ? 1
-                    : !secondRoofValues
-                        && primaryRoofValues!.pillars === 1
-                        && pitches === 'D'
-                            ? activeCoveringLength + 1
-                            : activeCoveringLength;
+                    ? Math.min(1, Math.max(renderedCoveringLength - xIndex, 0))
+                    : renderedCoveringLength;
                 mesh.position.set(beamPosition, coveringHeight, -zIndex);
                 mesh.rotation.set(0, Math.PI, -roofInclineRad);
                 mesh.translateX(-xIndex);
@@ -116,7 +112,7 @@ export default function CoveringLeft({material} : {material : THREE.Material}) {
             }
 
             coveringRef.current.instanceMatrix.needsUpdate = true;
-        }, [activeCoveringLength, count, xCount])
+        }, [count, renderedCoveringLength, xCount])
 
         return (
             <instancedUniformsMesh

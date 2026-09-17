@@ -126,7 +126,7 @@ export default function CoveringS({material} : {material : THREE.Material}) {
             ]
         );
         const fcTilesPerRow = coveringSpanLengths.reduce(
-            (total, spanLength) => total + Math.max(1, Math.floor(spanLength)),
+            (total, spanLength) => total + Math.max(1, Math.ceil(spanLength)),
             0
         );
         const zCount = Math.ceil(length);
@@ -197,7 +197,11 @@ export default function CoveringS({material} : {material : THREE.Material}) {
                     );
                     mesh.rotation.set(0, Math.PI, rotation);
                     if (xIndex !== undefined) {
-                        mesh.scale.set(1, 1, 1);
+                        mesh.scale.set(
+                            Math.min(1, Math.max(spanLength - xIndex, 0)),
+                            1,
+                            1
+                        );
                         mesh.translateX(-xIndex);
                     } else {
                         mesh.scale.set(spanLength, 1, interaxleLength);
@@ -210,7 +214,7 @@ export default function CoveringS({material} : {material : THREE.Material}) {
 
                     for (let zIndex = 0; zIndex < zCount; zIndex++) {
                         coveringSpanLengths.forEach((spanLength, beamIndex) => {
-                            const xCount = Math.max(1, Math.floor(spanLength));
+                            const xCount = Math.max(1, Math.ceil(spanLength));
 
                             for (let xIndex = 0; xIndex < xCount; xIndex++) {
                                 setCoveringTransform(

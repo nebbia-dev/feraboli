@@ -42,7 +42,7 @@ export default function DomeCoveringRight({material} : {material : THREE.Materia
         const {domeWidth, length} = requiredValues;
         const activeCoveringLength = domeWidth / 2 + 0.2;
         const xCount = coveringType === 'FC'
-            ? Math.max(1, Math.floor(activeCoveringLength))
+            ? Math.max(1, Math.ceil(activeCoveringLength))
             : 1;
         const zCount = Math.floor(length) + 1;
         const count = xCount * zCount;
@@ -66,7 +66,7 @@ export default function DomeCoveringRight({material} : {material : THREE.Materia
                 const zIndex = Math.floor(i / xCount);
 
                 mesh.scale.x = coveringType === 'FC'
-                    ? 1
+                    ? Math.min(1, Math.max(activeCoveringLength - xIndex, 0))
                     : activeCoveringLength;
                 mesh.position.set(
                     -0.2,

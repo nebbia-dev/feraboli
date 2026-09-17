@@ -8,13 +8,15 @@ import {getDefinedValues} from "@/app/_utils/getDefinedValues";
 export default function BeamsLeftDH({material} : {material : THREE.Material}) {
     const baseModel = useMeasurementsStore((state: State) => state.geometry);
     const pillars = useMeasurementsStore((state: State) => state.pillars);
-    const beamLengthDH = useMeasurementsStore((state: State) => state.beamLengthDH);
+    const beamLeftLength = useMeasurementsStore((state: State) => state.beamLeftLength);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
     const pillarsHeight = useMeasurementsStore((state: State) => state.pillarsHeight);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
 
     const ref = useRef<THREE.Mesh|null>(null);
     const beamGeometry = baseModel?.beamsLeft;
@@ -29,14 +31,16 @@ export default function BeamsLeftDH({material} : {material : THREE.Material}) {
         };
     }, [material]);
     const roofValues = getDefinedValues({
-        beamLengthDH,
+        beamLeftLength,
         eavesHeight,
         roofInclineRad: roofIncline.rad,
         width,
         length,
         interaxleLength,
         pillars,
-        pillarsHeight
+        pillarsHeight,
+        overhangLeft,
+        overhangRight
     });
 
     useLayoutEffect(() => {
@@ -65,14 +69,20 @@ export default function BeamsLeftDH({material} : {material : THREE.Material}) {
             if (!ref.current) return;
 
             if (roofValues) {
-                const {beamLengthDH, eavesHeight, roofInclineRad, width, length, interaxleLength} = roofValues;
+                const {beamLeftLength, eavesHeight, roofInclineRad, width, length, interaxleLength, overhangLeft, overhangRight} = roofValues;
                 const mesh = new THREE.Object3D();
+                const heightOffset = Math.max(overhangRight - overhangLeft, 0)
+                    * Math.tan(roofInclineRad);
 
                 for (let i = 0; i < (length / interaxleLength) + 1; i++) {
-                    mesh.scale.x = beamLengthDH;
+                    mesh.scale.x = beamLeftLength;
                     const shift = ref.current.geometry.boundingBox!.max.x;
                     ref.current.geometry.translate(-shift, 0, 0);
-                    mesh.position.set(-(width / 2), eavesHeight, i === 0 ? 0 : -interaxleLength * i);
+                    mesh.position.set(
+                        -(width / 2) - overhangLeft,
+                        eavesHeight + heightOffset,
+                        i === 0 ? 0 : -interaxleLength * i
+                    );
                     mesh.rotation.set(0, Math.PI, -roofInclineRad);
                     ref.current.geometry.attributes.position.needsUpdate = true;
                     mesh.updateMatrix();

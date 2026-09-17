@@ -9,24 +9,28 @@ export default function PurlinsOmegaRightDH({material} : {material : THREE.Mater
     const baseModel = useMeasurementsStore((state: State) => state.geometry);
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
-    const halfPurlinsDH = useMeasurementsStore((state: State) => state.halfPurlinsDH);
+    const halfRightPurlins = useMeasurementsStore((state: State) => state.halfRightPurlins);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
     const length = useMeasurementsStore((state: State) => state.length);
-    const coveringLengthDH = useMeasurementsStore((state: State) => state.coveringLengthDH);
+    const coveringRightLength = useMeasurementsStore((state: State) => state.coveringRightLength);
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
 
     const ref = useRef<THREE.Mesh|null>(null);
     const purlinGeometry = baseModel?.purlinsOmega;
     const requiredValues = getDefinedValues({
-        halfPurlinsDH,
+        halfRightPurlins,
         eavesHeight,
-        coveringLengthDH,
+        coveringRightLength,
         roofInclineRad: roofIncline.rad,
         width,
         length,
-        pillars
+        pillars,
+        overhangLeft,
+        overhangRight
     });
 
     if (!requiredValues || (requiredValues.pillars < 3 && pitches?.includes('M'))) {
@@ -37,29 +41,31 @@ export default function PurlinsOmegaRightDH({material} : {material : THREE.Mater
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {halfPurlinsDH, eavesHeight, coveringLengthDH, roofInclineRad, width, length} = requiredValues;
+            const {halfRightPurlins, eavesHeight, coveringRightLength, roofInclineRad, width, length, overhangLeft, overhangRight} = requiredValues;
             const mesh = new THREE.Object3D();
 
-
-            const base = coveringLengthDH * Math.cos(roofInclineRad);
-            const height = coveringLengthDH * Math.sin(roofInclineRad);
-            const purlinGap = ((coveringLengthDH / halfPurlinsDH) + 0.1) > 1.52
-                ? ((coveringLengthDH / halfPurlinsDH) + 0.1)
+            const beamPosition = (width / 2) + overhangRight;
+            const heightOffset = Math.max(overhangLeft - overhangRight, 0)
+                * Math.tan(roofInclineRad);
+            const base = coveringRightLength * Math.cos(roofInclineRad);
+            const height = coveringRightLength * Math.sin(roofInclineRad);
+            const purlinGap = ((coveringRightLength / halfRightPurlins) + 0.1) > 1.52
+                ? ((coveringRightLength / halfRightPurlins) + 0.1)
                 : 1.52;
             const purlinOffset = purlinType === 'light' ? 0.21 : 0;
 
-            for(let i = 0; i < halfPurlinsDH; i++) {
+            for(let i = 0; i < halfRightPurlins; i++) {
                 const h = ((purlinGap * i) + 0.1) * Math.sin(roofInclineRad);
                 const b = Math.sqrt(Math.pow((purlinGap * i), 2) - Math.pow(h, 2))
-                const purlinHeight = i === halfPurlinsDH - 1
-                                                    ? eavesHeight + height - purlinOffset - (0.308 * Math.sin(roofInclineRad))
-                                                    : eavesHeight + h - purlinOffset;
+                const purlinHeight = i === halfRightPurlins - 1
+                                                    ? eavesHeight + heightOffset + height - purlinOffset - (0.308 * Math.sin(roofInclineRad))
+                                                    : eavesHeight + heightOffset + h - purlinOffset;
 
                 const purlinPos = i === 0
-                    ? (width / 2) - 0.1
-                    : i === halfPurlinsDH - 1
-                            ? (width / 2) - base + 0.308
-                            : (width / 2) - 0.1 - b;
+                    ? beamPosition - 0.1
+                    : i === halfRightPurlins - 1
+                            ? beamPosition - base + 0.308
+                            : beamPosition - 0.1 - b;
 
                 mesh.scale.z = length + 1;
                 const shift =  ref.current.geometry.boundingBox!.max.x;
@@ -73,7 +79,7 @@ export default function PurlinsOmegaRightDH({material} : {material : THREE.Mater
         }, []);
 
         return(
-            <instancedUniformsMesh ref={ref} args={[purlinGeometry, material, requiredValues.halfPurlinsDH]}></instancedUniformsMesh>
+            <instancedUniformsMesh ref={ref} args={[purlinGeometry, material, requiredValues.halfRightPurlins]}></instancedUniformsMesh>
         )
     }
 

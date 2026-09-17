@@ -16,15 +16,17 @@ export function useBeamClippingMaterials(material: THREE.Material) {
     const pillars = useMeasurementsStore((state: State) => state.pillars);
     const pitches = useMeasurementsStore((state: State) => state.pitches);
     const beamLength = useMeasurementsStore((state: State) => state.beamLength);
-    const beamLengthDH = useMeasurementsStore((state: State) => state.beamLengthDH);
+    const beamLeftLength = useMeasurementsStore((state: State) => state.beamLeftLength);
+    const beamRightLength = useMeasurementsStore((state: State) => state.beamRightLength);
     const eavesHeight = useMeasurementsStore((state: State) => state.eavesHeight);
     const roofIncline = useMeasurementsStore((state: State) => state.roofIncline);
     const width = useMeasurementsStore((state: State) => state.width);
-    const secondBeamLength = useMeasurementsStore((state: State) => state.secondBeamLength);
     const secondRoofIncline = useMeasurementsStore((state: State) => state.secondRoofIncline);
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeight = useMeasurementsStore((state: State) => state.secondHeight);
     const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
     const beamBoundingBox = baseModel?.beamsLeft.boundingBox;
 
     const clipping = useMemo(() => {
@@ -66,73 +68,91 @@ export function useBeamClippingMaterials(material: THREE.Material) {
         };
     }, [material]);
 
+    const hasDoubleHeight = secondHeight !== undefined
+        && pillars !== undefined
+        && pillars > 3
+        && pitches === 'DH';
+    const isShed = pillars === 3 && pitches === 'S';
+    const isSingleBeamRoof = pillars !== undefined
+        && pillars < 3
+        && pitches?.includes('M');
+    const primaryLeftBeamLength = hasDoubleHeight || isSingleBeamRoof
+        ? beamLength
+        : beamLeftLength;
+    const primaryRightBeamLength = hasDoubleHeight || isSingleBeamRoof
+        ? beamLength
+        : beamRightLength;
+    const primaryLeftRoofInclineRad = isShed
+        ? secondRoofIncline.rad
+        : roofIncline.rad;
     const primaryRoofValues = getDefinedValues({
-        beamLength,
+        primaryLeftBeamLength,
+        primaryRightBeamLength,
         eavesHeight,
+        primaryLeftRoofInclineRad,
         roofInclineRad: roofIncline.rad,
         width,
         pillars,
         interaxleWidth,
         secondHeightOffset,
+        overhangLeft,
+        overhangRight,
         beamBoundingBox
     });
-    const secondRoofValues = getDefinedValues({
-        secondBeamLength,
-        eavesHeight,
-        secondRoofInclineRad: secondRoofIncline.rad,
-        width
-    });
-    const doubleHeightValues = secondHeight !== undefined
-        ? getDefinedValues({beamLengthDH})
+    const doubleHeightValues = hasDoubleHeight
+        ? getDefinedValues({beamLeftLength, beamRightLength, overhangLeft, overhangRight})
         : undefined;
     const ready = Boolean(
         primaryRoofValues
-        && (secondHeight === undefined || doubleHeightValues)
+        && (!hasDoubleHeight || doubleHeightValues)
     );
 
     useLayoutEffect(() => {
         if (!primaryRoofValues) return;
-        if (secondHeight !== undefined && !doubleHeightValues) return;
+        if (hasDoubleHeight && !doubleHeightValues) return;
 
         const {
-            beamLength,
+            primaryLeftBeamLength,
+            primaryRightBeamLength,
             eavesHeight,
+            primaryLeftRoofInclineRad,
             roofInclineRad,
             width,
             pillars,
             interaxleWidth,
             secondHeightOffset,
+            overhangLeft,
+            overhangRight,
             beamBoundingBox
         } = primaryRoofValues;
-        const hasDoubleHeight = secondHeight !== undefined && pillars > 3;
+        const leftHeightOffset = (hasDoubleHeight ? 0 : Math.max(overhangRight - overhangLeft, 0))
+            * Math.tan(roofInclineRad);
+        const rightHeightOffset = (hasDoubleHeight ? 0 : Math.max(overhangLeft - overhangRight, 0))
+            * Math.tan(roofInclineRad);
         const leftBeamPosition = hasDoubleHeight
             ? -(interaxleWidth / 2) - 0.5
-            : -(width / 2);
+            : -(width / 2) - overhangLeft;
         const rightBeamPosition = hasDoubleHeight
             ? (interaxleWidth / 2) + 0.5
-            : (width / 2);
+            : (width / 2) + overhangRight;
 
         const leftBeamMatrix = new THREE.Matrix4().compose(
             new THREE.Vector3(
-                secondRoofValues ? -(secondRoofValues.width / 2) : leftBeamPosition,
-                secondRoofValues
-                    ? secondRoofValues.eavesHeight
-                    : eavesHeight + secondHeightOffset,
+                leftBeamPosition,
+                eavesHeight + leftHeightOffset + secondHeightOffset,
                 0
             ),
             new THREE.Quaternion().setFromEuler(
                 new THREE.Euler(
                     0,
                     Math.PI,
-                    -(secondRoofValues?.secondRoofInclineRad ?? roofInclineRad)
+                    -primaryLeftRoofInclineRad
                 )
             ),
             new THREE.Vector3(
-                secondRoofValues
-                    ? secondRoofValues.secondBeamLength + 1
-                    : pillars < 3 && pitches?.includes("M")
-                        ? beamLength
-                        : beamLength + 1,
+                pillars < 3 && pitches?.includes("M")
+                    ? primaryLeftBeamLength
+                    : primaryLeftBeamLength + 1,
                 1,
                 1
             )
@@ -142,13 +162,13 @@ export function useBeamClippingMaterials(material: THREE.Material) {
             : new THREE.Matrix4().compose(
                 new THREE.Vector3(
                     rightBeamPosition,
-                    eavesHeight + secondHeightOffset,
+                    eavesHeight + rightHeightOffset + secondHeightOffset,
                     0
                 ),
                 new THREE.Quaternion().setFromEuler(
                     new THREE.Euler(0, 0, -roofInclineRad)
                 ),
-                new THREE.Vector3(beamLength + 1, 1, 1)
+                new THREE.Vector3(primaryRightBeamLength + 1, 1, 1)
             );
 
         clipping.primaryLeftPlane
@@ -158,20 +178,36 @@ export function useBeamClippingMaterials(material: THREE.Material) {
             .set(new THREE.Vector3(0, -1, 0), beamBoundingBox.min.y)
             .applyMatrix4(rightBeamMatrix);
 
-        if (secondHeight !== undefined && doubleHeightValues) {
+        if (hasDoubleHeight && doubleHeightValues) {
+            const outerLeftHeightOffset = Math.max(
+                doubleHeightValues.overhangRight - doubleHeightValues.overhangLeft,
+                0
+            ) * Math.tan(roofInclineRad);
+            const outerRightHeightOffset = Math.max(
+                doubleHeightValues.overhangLeft - doubleHeightValues.overhangRight,
+                0
+            ) * Math.tan(roofInclineRad);
             const outerLeftBeamMatrix = new THREE.Matrix4().compose(
-                new THREE.Vector3(-(width / 2), eavesHeight, 0),
+                new THREE.Vector3(
+                    -(width / 2) - doubleHeightValues.overhangLeft,
+                    eavesHeight + outerLeftHeightOffset,
+                    0
+                ),
                 new THREE.Quaternion().setFromEuler(
                     new THREE.Euler(0, Math.PI, -roofInclineRad)
                 ),
-                new THREE.Vector3(doubleHeightValues.beamLengthDH, 1, 1)
+                new THREE.Vector3(doubleHeightValues.beamLeftLength, 1, 1)
             );
             const outerRightBeamMatrix = new THREE.Matrix4().compose(
-                new THREE.Vector3(width / 2, eavesHeight, 0),
+                new THREE.Vector3(
+                    (width / 2) + doubleHeightValues.overhangRight,
+                    eavesHeight + outerRightHeightOffset,
+                    0
+                ),
                 new THREE.Quaternion().setFromEuler(
                     new THREE.Euler(0, 0, -roofInclineRad)
                 ),
-                new THREE.Vector3(doubleHeightValues.beamLengthDH, 1, 1)
+                new THREE.Vector3(doubleHeightValues.beamRightLength, 1, 1)
             );
 
             clipping.outerLeftPlane
@@ -184,10 +220,9 @@ export function useBeamClippingMaterials(material: THREE.Material) {
     }, [
         clipping,
         doubleHeightValues,
+        hasDoubleHeight,
         pitches,
-        primaryRoofValues,
-        secondHeight,
-        secondRoofValues
+        primaryRoofValues
     ]);
 
     useEffect(() => {

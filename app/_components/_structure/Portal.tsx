@@ -18,6 +18,8 @@ export default function Portal({material} : {material : THREE.Material}) {
     const length = useMeasurementsStore((state: State) => state.length);
     const interaxleLength = useMeasurementsStore((state: State) => state.interaxleLength);
     const secondHeight = useMeasurementsStore((state: State) => state.secondHeight);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
 
     const primaryLeftRef = useRef<THREE.Mesh|null>(null);
     const primaryRightRef = useRef<THREE.Mesh|null>(null);
@@ -34,6 +36,8 @@ export default function Portal({material} : {material : THREE.Material}) {
         width,
         length,
         interaxleLength,
+        overhangLeft,
+        overhangRight,
     });
 
     if (!requiredValues || !beamClipping.ready) return null;
@@ -58,6 +62,12 @@ export default function Portal({material} : {material : THREE.Material}) {
         }
 
         return remainder;
+    }).filter((pillarIndex) => {
+        const isFirstPillar = pillarIndex === 0;
+        const isLastPillar = pillarIndex === requiredValues.pillars - 1;
+
+        return !(isFirstPillar && requiredValues.overhangLeft < 1.5)
+            && !(isLastPillar && requiredValues.overhangRight < 1.5);
     });
     const groupedPillarIndices: Record<BeamClippingGroup, number[]> = {
         primaryLeft: [],

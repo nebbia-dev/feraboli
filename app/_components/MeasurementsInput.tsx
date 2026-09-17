@@ -499,7 +499,7 @@ export default function MeasurementsInput() {
            return;
        }
 
-       if(measurements.overhangRight === '' || measurements.overhangLeft === '') {
+       if(measurements.pillars !== '10' && (measurements.overhangRight === '' || measurements.overhangLeft === '')) {
            return;
        }
 
@@ -507,7 +507,11 @@ export default function MeasurementsInput() {
            return;
        }
 
-        if(measurements.coveringType === '5G' && (measurements.thicknessTop === '' || measurements.thicknessBottom === '')) {
+        if(measurements.coveringSubType === 'DL' && (measurements.thicknessTop === '' || measurements.thicknessBottom === '')) {
+            return;
+        }
+
+        if(measurements.coveringSubType === 'V' && measurements.thicknessTop === '') {
             return;
         }
 
@@ -812,31 +816,34 @@ export default function MeasurementsInput() {
                                         {/*</label>*/}
 
                                         {/*  SPORTO DESTRO  */}
-                                        <label className="flex flex-col uppercase text-xsm font-semibold">Sporto destro
-                                            <div
-                                                className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>
-                                            <input
-                                                required
-                                                className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"
-                                                value={measurements.overhangRight}
-                                                name="overhangRight"
-                                                onChange={validateInput}
-                                            />
-                                        </label>
+                                        {measurements.pillars !== '10' &&
+                                            <>
+                                                <label className="flex flex-col uppercase text-xsm font-semibold">Sporto destro
+                                                    <div
+                                                        className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>
+                                                    <input
+                                                        required
+                                                        className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"
+                                                        value={measurements.overhangRight}
+                                                        name="overhangRight"
+                                                        onChange={validateInput}
+                                                    />
+                                                </label>
 
-                                        {/*  SPORTO SINISTRO  */}
-                                        <label className="flex flex-col uppercase text-xsm font-semibold">Sporto sinistro
-                                            <div
-                                                className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>
-                                            <input
-                                                required
-                                                className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"
-                                                value={measurements.overhangLeft}
-                                                name="overhangLeft"
-                                                onChange={validateInput}
-                                            />
-                                        </label>
-
+                                                {/*  SPORTO SINISTRO  */}
+                                                <label className="flex flex-col uppercase text-xsm font-semibold">Sporto sinistro
+                                                    <div
+                                                    className="relative font-jet text-xs lowercase after:content-['m'] after:absolute after:top-[14px] after:left-[90%]"></div>
+                                                    <input
+                                                    required
+                                                    className="mt-2 p-1 pl-2 rounded-lg border-strokes border-2 font-jet text-xs focus:border-primary focus:outline-none focus:ring-0"
+                                                    value={measurements.overhangLeft}
+                                                    name="overhangLeft"
+                                                    onChange={validateInput}
+                                                    />
+                                                </label>
+                                            </>
+                                        }
                                     </div>
                                 </AccordionDetails>
                             </Accordion>
