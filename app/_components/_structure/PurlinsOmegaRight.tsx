@@ -21,6 +21,8 @@ export default function PurlinsOmegaRight({material} : {material : THREE.Materia
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
 
     const ref = useRef<THREE.Mesh|null>(null);
     const purlinGeometry = baseModel?.purlinsOmega;
@@ -38,7 +40,9 @@ export default function PurlinsOmegaRight({material} : {material : THREE.Materia
         roofInclineRad: roofIncline.rad,
         width,
         length,
-        pillars
+        pillars,
+        overhangRight,
+        overhangLeft
     });
 
     if (!requiredValues || (requiredValues.pillars < 3 && pitches?.includes('M'))) {
@@ -49,12 +53,20 @@ export default function PurlinsOmegaRight({material} : {material : THREE.Materia
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {activeHalfPurlins, eavesHeight, activeCoveringLength, roofInclineRad, width, length, pillars} = requiredValues;
+            const {activeHalfPurlins, eavesHeight, activeCoveringLength, roofInclineRad, width, length, pillars, overhangRight, overhangLeft} = requiredValues;
             const mesh = new THREE.Object3D();
+            const omegaWidth = ref.current.geometry.boundingBox!.getSize(new THREE.Vector3()).x;
+            const omegaOffsetX = omegaWidth * Math.cos(roofInclineRad);
+            const omegaOffsetY = omegaWidth * Math.sin(roofInclineRad);
 
             const beamPosition = (interaxleWidth && pillars > 3 && pitches === 'DH')
                 ? (interaxleWidth / 2) + 0.5
-                : (width / 2)
+                : (width / 2) + overhangRight
+
+            const hoverhang = !isDoubleHeight && overhangLeft > overhangRight
+                ? overhangLeft - overhangRight
+                : 0;
+            const hta = hoverhang * Math.tan(roofInclineRad);
 
             const base = activeCoveringLength * Math.cos(roofInclineRad);
             const height = activeCoveringLength * Math.sin(roofInclineRad);
@@ -64,22 +76,27 @@ export default function PurlinsOmegaRight({material} : {material : THREE.Materia
             const purlinOffset = purlinType === 'light' ? 0.21 : 0;
 
             for(let i = 0; i < activeHalfPurlins; i++) {
+                const hasProfileOffset = i !== 0;
                 const h = ((purlinGap * i) + 0.1) * Math.sin(roofInclineRad);
                 const b = Math.sqrt(Math.pow((purlinGap * i), 2) - Math.pow(h, 2))
                 const purlinHeight = i === activeHalfPurlins - 1
-                                                    ? eavesHeight + height - purlinOffset + secondHeightOffset - (0.308 * Math.sin(roofInclineRad))
-                                                    : eavesHeight + h - purlinOffset + secondHeightOffset;
+                                                    ? eavesHeight + hta + height - purlinOffset + secondHeightOffset
+                                                    : eavesHeight + hta + h - purlinOffset + secondHeightOffset;
 
                 const purlinPos = i === 0
                     ? beamPosition - 0.1
                     : i === activeHalfPurlins - 1
-                            ? beamPosition - base + 0.308
+                            ? beamPosition - base
                             : beamPosition - 0.1 - b;
 
                 mesh.scale.z = length + 1;
                 const shift =  ref.current.geometry.boundingBox!.max.x;
                 ref.current.geometry.translate(-shift, 0, 0);
-                mesh.position.set(purlinPos, purlinHeight, -length / 2);
+                mesh.position.set(
+                    purlinPos + (hasProfileOffset ? omegaOffsetX : 0),
+                    purlinHeight - (hasProfileOffset ? omegaOffsetY : 0),
+                    -length / 2
+                );
                 mesh.rotation.set(0, 0, -roofInclineRad)
                 ref.current.geometry.attributes.position.needsUpdate = true;
                 mesh.updateMatrix();

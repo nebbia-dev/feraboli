@@ -24,17 +24,22 @@ export default function PurlinsOmegaLeft({material} : {material : THREE.Material
     const purlinType = useMeasurementsStore((state: State) => state.purlinType);
     const interaxleWidth = useMeasurementsStore((state: State) => state.interaxleWidth);
     const secondHeightOffset = useMeasurementsStore((state: State) => state.secondHeightOffset);
+    const overhangRight = useMeasurementsStore((state: State) => state.overhangRight);
+    const overhangLeft = useMeasurementsStore((state: State) => state.overhangLeft);
 
     const ref = useRef<THREE.Mesh|null>(null);
     const purlinGeometry = baseModel?.purlinsOmega;
     const isDoubleHeight = pillars !== undefined && pillars > 3 && pitches === 'DH';
+    const isMono = pillars !== undefined && pillars < 3 && pitches?.includes('M');
     const primaryHalfPurlins = isDoubleHeight
         ? halfPurlinsDH
         : halfLeftPurlins ?? halfPurlins;
-    const primaryCoveringLength = isDoubleHeight
+    const primaryCoveringLength = isDoubleHeight || isMono
         ? coveringLength
         : coveringLeftLength ?? coveringLength;
-    const hP = secondHalfPurlins ?? primaryHalfPurlins;
+    const hP = isMono
+        ? primaryHalfPurlins
+        : secondHalfPurlins ?? primaryHalfPurlins;
     const requiredValues = getDefinedValues({
         hP,
         eavesHeight,
@@ -42,7 +47,9 @@ export default function PurlinsOmegaLeft({material} : {material : THREE.Material
         roofInclineRad: roofIncline.rad,
         width,
         length,
-        pillars
+        pillars,
+        overhangRight,
+        overhangLeft
     });
 
     if (!requiredValues) return null;
@@ -51,47 +58,62 @@ export default function PurlinsOmegaLeft({material} : {material : THREE.Material
         useLayoutEffect(() => {
             if (!ref.current) return;
 
-            const {hP, eavesHeight, primaryCoveringLength, roofInclineRad, width, length, pillars} = requiredValues;
-            const cL = secondCoveringLength ?? primaryCoveringLength;
-            const roofRad = secondRoofIncline.rad ?? roofInclineRad;
+            const {hP, eavesHeight, primaryCoveringLength, roofInclineRad, width, length, pillars, overhangRight, overhangLeft} = requiredValues;
+            const cL = isMono
+                ? primaryCoveringLength
+                : secondCoveringLength ?? primaryCoveringLength;
+            const roofRad = isMono
+                ? roofInclineRad
+                : secondRoofIncline.rad ?? roofInclineRad;
             const mesh = new THREE.Object3D();
+            const omegaWidth = ref.current.geometry.boundingBox!.getSize(new THREE.Vector3()).x;
+            const omegaOffsetX = omegaWidth * Math.cos(roofRad);
+            const omegaOffsetY = omegaWidth * Math.sin(roofRad);
+
+            const hoverhang = !isDoubleHeight && overhangLeft < overhangRight
+                ? overhangRight - overhangLeft
+                : 0;
+
+            const hta = hoverhang * Math.tan(roofInclineRad);
 
             const beamPosition = (interaxleWidth && pillars > 3 && pitches === 'DH')
                 ? -(interaxleWidth / 2) - 0.5
-                : -(width / 2)
+                : -(width / 2) - overhangLeft
 
             const base = cL * Math.cos(roofRad);
-            const height = (cL + 0.1) * Math.sin(roofRad);
-            const purlinGap = (((cL + 0.1) / hP) + 0.1) > 1.52
-                                        ? (((cL + 0.1) / hP) + 0.1)
+            const height = (cL - 0.1) * Math.sin(roofRad);
+            const purlinGap = (((cL - 0.1) / hP) + 0.1) > 1.52
+                                        ? (((cL - 0.1) / hP) + 0.1)
                                         : 1.52;
             const purlinOffset = purlinType === 'light' ? 0.21 : 0;
-            const centralBeamHeight = eavesHeight
-                + (0 - beamPosition) * Math.tan(roofRad);
 
             for(let i = 0; i < hP; i++) {
-                const h = ((purlinGap * i) + 0.1) * Math.sin(roofRad);
+                const h = ((purlinGap * i) - 0.1) * Math.sin(roofRad);
                 const b = Math.sqrt(Math.pow((purlinGap * i), 2) - Math.pow(h, 2))
                 const purlinHeight = i === 0
-                                                ? eavesHeight - purlinOffset + secondHeightOffset + (0.308 * Math.sin(roofRad))
+                                                ? eavesHeight + hta - purlinOffset + secondHeightOffset
                                                 : i === hP - 1 && secondCoveringLength
-                                                    ? centralBeamHeight - purlinOffset + secondHeightOffset
+                                                    ? eavesHeight + hta + height - 0.1 - purlinOffset + secondHeightOffset
                                                     : i === hP - 1
-                                                        ? eavesHeight + height - purlinOffset + secondHeightOffset
-                                                        : eavesHeight + h - purlinOffset + secondHeightOffset;
+                                                        ? eavesHeight + hta + height - purlinOffset + secondHeightOffset
+                                                        : eavesHeight + hta + h - purlinOffset + secondHeightOffset;
 
                 const purlinPos = i === 0
-                                            ? beamPosition + 0.308
+                                            ? beamPosition
                                             : i === hP - 1 && secondCoveringLength
                                                 ? 0
                                                 : i === hP - 1
-                                                    ? base + beamPosition + 0.1
-                                                    : b + beamPosition + 0.1;
+                                                    ? base + beamPosition - 0.1
+                                                    : b + beamPosition - 0.1;
 
                 mesh.scale.z = length + 1;
                 const shift =  ref.current.geometry.boundingBox!.max.x;
                 ref.current.geometry.translate(-shift, 0, 0);
-                mesh.position.set(purlinPos, purlinHeight, -length / 2);
+                mesh.position.set(
+                    purlinPos + omegaOffsetX,
+                    purlinHeight + omegaOffsetY,
+                    -length / 2
+                );
                 mesh.rotation.set(0, 0, roofRad)
                 ref.current.geometry.attributes.position.needsUpdate = true;
                 mesh.updateMatrix();

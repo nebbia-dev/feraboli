@@ -46,40 +46,47 @@ export default function PurlinsOmegaLeftDH({material} : {material : THREE.Materi
             const cL = secondCoveringLength ?? coveringLeftLength;
             const roofRad = secondRoofIncline.rad ?? roofInclineRad;
             const mesh = new THREE.Object3D();
+            const omegaWidth = ref.current.geometry.boundingBox!.getSize(new THREE.Vector3()).x;
+            const omegaOffsetX = omegaWidth * Math.cos(roofRad);
+            const omegaOffsetY = omegaWidth * Math.sin(roofRad);
             const beamPosition = -(width / 2) - overhangLeft;
             const heightOffset = Math.max(overhangRight - overhangLeft, 0)
                 * Math.tan(roofRad);
 
             const base = cL * Math.cos(roofRad);
-            const height = (cL + 0.1) * Math.sin(roofRad);
-            const purlinGap = (((cL + 0.1) / hP) + 0.1) > 1.52
-                                        ? (((cL + 0.1) / hP) + 0.1)
+            const height = (cL - 0.1) * Math.sin(roofRad);
+            const purlinGap = (((cL - 0.1) / hP) + 0.1) > 1.52
+                                        ? (((cL - 0.1) / hP) + 0.1)
                                         : 1.52;
             const purlinOffset = purlinType === 'light' ? 0.21 : 0;
 
             for(let i = 0; i < hP; i++) {
-                const h = ((purlinGap * i) + 0.1) * Math.sin(roofRad);
+                const h = ((purlinGap * i) - 0.1) * Math.sin(roofRad);
                 const b = Math.sqrt(Math.pow((purlinGap * i), 2) - Math.pow(h, 2))
                 const purlinHeight = i === 0
-                                                ? eavesHeight + heightOffset - purlinOffset + (0.308 * Math.sin(roofRad))
+                                                ? eavesHeight + heightOffset - purlinOffset
                                                 : i === hP - 1 && secondCoveringLength
-                                                    ? eavesHeight + heightOffset + height + 0.1 - purlinOffset
+                                                    ? eavesHeight + heightOffset + height - 0.1 - purlinOffset
                                                     : i === hP - 1
-                                                        ? eavesHeight + heightOffset + height - purlinOffset - (0.204 * Math.sin(roofInclineRad))
+                                                        ? eavesHeight + heightOffset + height - purlinOffset
                                                         : eavesHeight + heightOffset + h - purlinOffset;
 
                 const purlinPos = i === 0
-                                            ? beamPosition + 0.308
+                                            ? beamPosition
                                             : i === hP - 1 && secondCoveringLength
                                                 ? 0
                                             : i === hP - 1
-                                                    ? base + beamPosition - 0.102
-                                                    : b + beamPosition + 0.1;
+                                                    ? base + beamPosition - 0.1
+                                                    : b + beamPosition - 0.1;
 
                 mesh.scale.z = length + 1;
                 const shift =  ref.current.geometry.boundingBox!.max.x;
                 ref.current.geometry.translate(-shift, 0, 0);
-                mesh.position.set(purlinPos, purlinHeight, -length / 2);
+                mesh.position.set(
+                    purlinPos + omegaOffsetX,
+                    purlinHeight + omegaOffsetY,
+                    -length / 2
+                );
                 mesh.rotation.set(0, 0, roofRad)
                 ref.current.geometry.attributes.position.needsUpdate = true;
                 mesh.updateMatrix();
